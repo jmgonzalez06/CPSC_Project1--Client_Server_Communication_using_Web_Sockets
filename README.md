@@ -1,3 +1,12 @@
+## Needed Commands to get it running
+1. python.exe -m pip install --upgrade pip 
+2. pip install websockets
+3. pip install bcrypt
+4. pip install -r backend/requirements.txt
+
+# To run, use terminal to run the following command and open index.html on your browser 
+python ./backend/server.py
+
 # CPSC_Project1--Client_Server_Communication_using_Web_Sockets
 
 You are a security tooling analyst working for SecureTech Solutions, a company specializing in software for distributed teams. The company is developing a real-time communication tool called SecureChat, aimed at remote teams that require secure and efficient communication without relying on third-party services like Slack or Teams. Your task is to design and implement the communication system for SecureChat, focusing on secure WebSocket-based communication.

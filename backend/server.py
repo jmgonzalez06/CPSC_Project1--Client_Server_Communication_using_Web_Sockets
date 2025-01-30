@@ -1,10 +1,18 @@
 import asyncio
 import websockets
+import os
+from dotenv import load_dotenv
 import json
 from db import authenticate_user  # Import authentication function
 
 # Store connected clients
 connected_clients = set()
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Get the port from the environment variable, default to 8080 if not set
+PORT = int(os.getenv("PORT", 8080))
 
 async def handle_connection(websocket, path):
     # Add the new client to the connected clients set
@@ -25,7 +33,7 @@ async def handle_connection(websocket, path):
         print(f"Client disconnected. Total clients: {len(connected_clients)}")
 
 # Start the WebSocket server
-start_server = websockets.serve(handle_connection, "localhost", 8080)
+start_server = websockets.serve(handle_connection, "localhost", PORT)
 
 print("WebSocket server is running on ws://localhost:8080")
 

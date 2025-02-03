@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 import json
 from db import authenticate_user  # Import authentication function
+import time
 
 # Store connected clients
 connected_clients = set()
@@ -14,13 +15,34 @@ load_dotenv()
 # Get the port from the environment variable, default to 8080 if not set
 PORT = int(os.getenv("PORT", 8080))
 
+# Settings for rate limit
+RATE_LIMIT_INTERVAL = 5 # 5 seconds
+RATE_LIMIT_THRESHOLD = 5 # 5 messages per interval
+
+# Store each client's message frequency
+client_msg_freq = {}
+
 async def handle_connection(websocket, path):
     # Add the new client to the connected clients set
     connected_clients.add(websocket)
     print(f"New client connected. Total clients: {len(connected_clients)}")
 
+    # Get client's id and prepare to track
+    client_id = id(websocket)
+    client_msg_freq[client_id] = (time.time(), 0)
     try:
         async for message in websocket:
+            # Check rate limit
+            timestamp, frequency = client_msg_freq[client_id]
+            if time.time() - timestamp < RATE_LIMIT_INTERVAL:
+                if frequency >= RATE_LIMIT_THRESHOLD:
+                    await websocket.send("Please wait to send more messages!")
+                    continue
+                client_msg_freq[client_id] = (timestamp, frequency + 1)
+            else:
+                client_msg_freq[client_id] = (time.time(), 1)
+
+            # Handle message
             print(f"Received: {message}")
 
             # Broadcast the message to all connected clients
@@ -29,6 +51,7 @@ async def handle_connection(websocket, path):
                     await client.send(message)
     finally:
         # Remove the client when they disconnect
+        del client_msg_freq[client_id]
         connected_clients.remove(websocket)
         print(f"Client disconnected. Total clients: {len(connected_clients)}")
 

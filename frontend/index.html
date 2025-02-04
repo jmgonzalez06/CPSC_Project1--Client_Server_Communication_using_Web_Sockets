@@ -1,15 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SecureChat</title>
+    <title>SecureChat</title> <!-- Name of Page -->
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
-    <div id="chat">
-        <div id="messages"></div>
-        <input type="text" id="messageInput" placeholder="Type a message...">
+
+<body> <!-- Plan is to have a page to login and a page to send messages after user has logged on -->
+    <!-- Login Page -->
+    <div id="login-page">
+        <h1>Login to SecureChat</h1>
+        <input type="text" id="username" placeholder="Username" required>
+        <input type="password" id="password" placeholder="Password" required>
+        <button id="login-button">Login</button>
+    </div>
+
+    <!-- Chat Screen -->
+    <div id="chat-screen" style="display: none;">
+        <div id="header">
+            <h1>SecureChat</h1>
+            <button id="logout-button">Logout</button> <!-- Logout Button Added -->
+        </div>
+        <div id="chat-history"></div>
+        <div id="chat-input">
+            <input type="text" id="message-input" placeholder="Type a message..." disabled>
+            <button id="send-button" disabled>Send</button> <!-- Send Button Created -->
+        </div>
     </div>
     <script src="script.js"></script>
 </body>

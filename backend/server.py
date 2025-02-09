@@ -22,6 +22,9 @@ RATE_LIMIT_THRESHOLD = 5 # 5 messages per interval
 # Store each client's message frequency
 client_msg_freq = {}
 
+# Heartbeat frequency
+HEARTBEAT_FREQ = 10  # 10 seconds
+
 async def handle_connection(websocket, path):
     # Add the new client to the connected clients set
     connected_clients.add(websocket)
@@ -30,6 +33,10 @@ async def handle_connection(websocket, path):
     # Get client's id and prepare to track
     client_id = id(websocket)
     client_msg_freq[client_id] = (time.time(), 0)
+
+    # Loop heartbeats
+    asyncio.create_task(heartbeat(websocket, client_id))
+
     try:
         async for message in websocket:
             # Check rate limit
@@ -49,11 +56,21 @@ async def handle_connection(websocket, path):
             for client in connected_clients:
                 if client != websocket and client.open:
                     await client.send(message)
-    finally:
-        # Remove the client when they disconnect
-        del client_msg_freq[client_id]
-        connected_clients.remove(websocket)
-        print(f"Client disconnected. Total clients: {len(connected_clients)}")
+    except websockets.ConnectionClosed:
+        print("Client connection has closed.")
+          
+
+async def heartbeat(websocket, client_id):
+    while True:
+        try:
+            await websocket.ping()
+            await asyncio.sleep(HEARTBEAT_FREQ)
+        except websockets.ConnectionClosed:
+            del client_msg_freq[client_id]
+            connected_clients.remove(websocket)
+            print(f"Client disconnected. Total clients: {len(connected_clients)}")
+            break
+
 
 # Start the WebSocket server
 start_server = websockets.serve(handle_connection, "localhost", PORT)

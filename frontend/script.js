@@ -63,9 +63,12 @@ function sendMessage() {
     const message = messageInput.value.trim();
     if (!message) return;
 
-    // Display the message locally (replace with WebSocket send later)
-    addMessageToChat(`${currentUser}: ${message}`);
+    // Send message with WebSocket send
+    ws.send(`${currentUser}: ${message}`);
     messageInput.value = '';
+
+    // Add user's message to chat history
+    addMessageToChat(`${currentUser}: ${message}`);
 }
 
 // Add a message to the chat history
@@ -114,10 +117,14 @@ ws.onopen = () => {
 };
 
 ws.onmessage = (event) => {
-    const messages = document.getElementById('messages');
-    const message = document.createElement('div');
-    message.textContent = event.data;
-    messages.appendChild(message);
+    // const messages = document.getElementById('messages');
+    // const message = document.createElement('div');
+    // message.textContent = event.data;
+    // messages.appendChild(message);
+    if (event.data.startsWith('heartbeat')) {
+        return;
+    }
+    addMessageToChat(event.data);
 };
 
 ws.onclose = () => {

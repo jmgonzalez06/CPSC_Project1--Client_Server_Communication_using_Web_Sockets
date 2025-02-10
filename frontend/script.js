@@ -107,6 +107,10 @@ logoutButton.addEventListener('click', () => {
 
 ws.onopen = () => {
     console.log('Connected to the WebSocket server');
+    // Heartbeat loop
+    setInterval(() => {
+        ws.send('heartbeat');
+    }, 10000); // 10 sec interval
 };
 
 ws.onmessage = (event) => {

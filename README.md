@@ -4,8 +4,12 @@
 3. pip install bcrypt
 4. pip install -r backend/requirements.txt
 
+# Make sure to set IP of WebSocket Server PC in script.js
+
 # To run, use terminal to run the following command and open index.html on your browser 
 python ./backend/server.py
+
+# To connect on another device, connect with http://HOSTIP:8081, and navigate to frontend
 
 # To rerun, delete "securechat.db" before running the previous command
 

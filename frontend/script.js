@@ -1,5 +1,6 @@
-// Our Websocket DOM element
-const ws = new WebSocket('ws://localhost:8080');
+// Our Websocket DOM element 
+// (set your own device local ip e.g. 192.168.xx.xx)
+const ws = new WebSocket('ws://192.168.68.64:8080');
 
 // Select DOM elements that we need for index.html
 const loginPage = document.getElementById('login-page');
@@ -110,6 +111,7 @@ logoutButton.addEventListener('click', () => {
 
 ws.onopen = () => {
     console.log('Connected to the WebSocket server');
+    console.log(wsUrl)
     // Heartbeat loop
     setInterval(() => {
         ws.send('heartbeat');

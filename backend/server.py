@@ -5,6 +5,15 @@ from dotenv import load_dotenv
 import json
 from db import authenticate_user  # Import authentication function
 import time
+import socket
+import http.server
+import socketserver
+import threading
+
+# Get local network IP of server
+def get_local_ip():
+    hostname = socket.gethostname()
+    return socket.gethostbyname(hostname)
 
 # Store connected clients
 connected_clients = set()
@@ -13,6 +22,7 @@ connected_clients = set()
 load_dotenv()
 
 # Get the port from the environment variable, default to 8080 if not set
+HOST = get_local_ip()
 PORT = int(os.getenv("PORT", 8080))
 
 # Settings for rate limit
@@ -24,6 +34,17 @@ client_msg_freq = {}
 
 # Heartbeat frequency
 HEARTBEAT_FREQ = 10  # 10 seconds
+
+# Create simple HTTP server to serve static files
+PORT_HTTP = 8081
+httpd = socketserver.TCPServer(("", PORT_HTTP), http.server.SimpleHTTPRequestHandler)
+print(f"HTTP server serving on port {PORT_HTTP}")
+
+# Run the HTTP server
+http_thread = threading.Thread(target=httpd.serve_forever)
+http_thread.daemon = True # Set as daemon to exit with main thread
+http_thread.start()
+
 
 async def handle_connection(websocket, path):
     # Add the new client to the connected clients set
@@ -73,9 +94,9 @@ async def heartbeat(websocket, client_id):
 
 
 # Start the WebSocket server
-start_server = websockets.serve(handle_connection, "localhost", PORT)
+start_server = websockets.serve(handle_connection, HOST, PORT)
 
-print("WebSocket server is running on ws://localhost:8080")
+print("WebSocket server is running on ws://" + HOST + ":" + str(PORT))
 
 # Run the server
 asyncio.get_event_loop().run_until_complete(start_server)

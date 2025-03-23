@@ -1,4 +1,5 @@
 import asyncio
+from flask import Flask, request, jsonify
 import websockets
 import os
 from dotenv import load_dotenv
@@ -94,8 +95,13 @@ async def heartbeat(websocket, client_id):
             break
 
 # Path to your SSL/TLS certificate and private key
-SSL_CERTFILE = r"G:\Grad School Projects\CPSC 455 - Web Security\CPSC_Project1--Client_Server_Communication_using_Web_Sockets\backend\cert.pem"
-SSL_KEYFILE = r"G:\Grad School Projects\CPSC 455 - Web Security\CPSC_Project1--Client_Server_Communication_using_Web_Sockets\backend\key.pem"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))   # Path to the backend folder
+SSL_CERTFILE = os.path.join(BASE_DIR, "cert.pem")      # Path to cert.pem
+SSL_KEYFILE = os.path.join(BASE_DIR, "key.pem")        # Path to key.pem
+
+# Verify that the certificate files exist
+if not os.path.exists(SSL_CERTFILE) or not os.path.exists(SSL_KEYFILE):
+    raise FileNotFoundError("Certificate files (cert.pem and key.pem) are missing from the backend folder.")
 
 # Start the WebSocket server with SSL/TLS
 ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -116,3 +122,32 @@ print(f"WebSocket server is running on wss://{HOST}:{PORT}")
 # Run the server
 asyncio.get_event_loop().run_until_complete(start_server)
 asyncio.get_event_loop().run_forever()
+
+# Initialize Flask app
+app = Flask(__name__)
+
+# API endpoint for user login
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+
+    if not username or not password:
+        return jsonify({'success': False, 'message': 'Username and password are required.'}), 400
+
+    # Authenticate user using the database
+    if authenticate_user(username, password):
+        return jsonify({'success': True, 'message': 'Login successful.'}), 200
+    else:
+        return jsonify({'success': False, 'message': 'Invalid username or password.'}), 401
+
+# Start the Flask server in a separate thread
+def run_flask():
+    app.run(host='0.0.0.0', port=5000, debug=True)
+
+flask_thread = threading.Thread(target=run_flask)
+flask_thread.daemon = True
+flask_thread.start()
+
+print(f"Flask server is running on http://{HOST}:5000")

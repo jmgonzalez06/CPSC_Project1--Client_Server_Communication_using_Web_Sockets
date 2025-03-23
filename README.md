@@ -2,7 +2,8 @@
 1. python.exe -m pip install --upgrade pip 
 2. pip install websockets
 3. pip install bcrypt
-4. pip install -r backend/requirements.txt
+4. pip install flask-cors
+5. pip install -r backend/requirements.txt
 
 # Make sure to set IP of WebSocket Server PC in script.js
 
@@ -10,10 +11,13 @@
 python ./backend/server.py
 
 # To connect on another device, use the URL
-# http://<>/frontend/index.html
+# http://<HOST IP>/frontend/index.html
 # Change IP to your network. Need to be connected to same network.
 
-# To rerun, delete "securechat.db" before running the previous command
+# Test User Login Info
+# User 1 : user1, password123
+# User 2 : user2, password456
+# User 3 : user3, password789
 
 # CPSC_Project1--Client_Server_Communication_using_Web_Sockets
 

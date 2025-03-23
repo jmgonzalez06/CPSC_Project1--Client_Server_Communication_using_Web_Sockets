@@ -9,7 +9,9 @@
 # To run, use terminal to run the following command and open index.html on your browser 
 python ./backend/server.py
 
-# To connect on another device, connect with http://HOSTIP:8081, and navigate to frontend
+# To connect on another device, use the URL
+# http://<>/frontend/index.html
+# Change IP to your network. Need to be connected to same network.
 
 # To rerun, delete "securechat.db" before running the previous command
 

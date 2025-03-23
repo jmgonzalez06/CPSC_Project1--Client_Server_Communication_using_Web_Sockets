@@ -1,7 +1,10 @@
 // Our Websocket DOM element 
-// (set your own device local ip e.g. 192.168.xx.xx)
-const wsUrl = 'wss://192.168.68.64:8080';
+// Dynamically construct the WebSocket URL
+const host = window.location.hostname; // Get the hostname (e.g., 192.168.0.128)
+const wsUrl = `wss://${host}:8080`;    // Use the same hostname for WebSocket
 const ws = new WebSocket(wsUrl);
+
+console.log(`Connecting to WebSocket server at: ${wsUrl}`);
 
 // Select DOM elements that we need for index.html
 const loginPage = document.getElementById('login-page');
@@ -17,7 +20,7 @@ const logoutButton = document.getElementById('logout-button');
 let currentUser = null;
 
 // Login functionality
-loginButton.addEventListener('click', () => {
+loginButton.addEventListener('click', async () => {
     const username = usernameInput.value.trim();
     const password = passwordInput.value.trim();
 
@@ -25,26 +28,30 @@ loginButton.addEventListener('click', () => {
         alert('Please enter both username and password.');
         return;
     }
+    try {
+        // Dynamically construct the API URL
+        const host = window.location.hostname || 'localhost'; // Fallback to localhost
+        const response = await fetch(`http://${host}:5000/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
 
-    // Simulate authentication (replace with actual API call later)
-    if (authenticateUser(username, password)) {
-        currentUser = username;
-        loginPage.style.display = 'none';
-        chatScreen.style.display = 'block';
-        messageInput.disabled = false;
-        sendButton.disabled = false;
-
-        // Scroll to the bottom of the chat history when entering the chat
-        setTimeout(scrollToBottom, 0); // Use setTimeout to ensure rendering is complete
-
-        // Display a warning for the test user
-        if (currentUser === 'test') {
-            alert(`Welcome, ${currentUser}! (This is a test account for development purposes.)`);
-        } else {
+        const result = await response.json();
+        if (result.success) {
+            currentUser = username;
+            loginPage.style.display = 'none';
+            chatScreen.style.display = 'block';
+            messageInput.disabled = false;
+            sendButton.disabled = false;
+            scrollToBottom();
             alert(`Welcome, ${currentUser}!`);
+        } else {
+            alert(result.message || 'Invalid username or password.');
         }
-    } else {
-        alert('Invalid username or password.');
+    } catch (error) {
+        console.error('Login error:', error);
+        alert('An error occurred during login. Please try again.');
     }
 });
 

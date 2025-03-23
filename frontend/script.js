@@ -1,10 +1,6 @@
 // Our Websocket DOM element 
-// Dynamically construct the WebSocket URL
-const host = window.location.hostname; // Get the hostname (e.g., 192.168.0.128)
-const wsUrl = `wss://${host}:8080`;    // Use the same hostname for WebSocket
-const ws = new WebSocket(wsUrl);
-
-console.log(`Connecting to WebSocket server at: ${wsUrl}`);
+// (set your own device local ip e.g. 192.168.xx.xx)
+const ws = new WebSocket('ws://192.168.68.64:8080');
 
 // Select DOM elements that we need for index.html
 const loginPage = document.getElementById('login-page');
@@ -20,7 +16,7 @@ const logoutButton = document.getElementById('logout-button');
 let currentUser = null;
 
 // Login functionality
-loginButton.addEventListener('click', async () => {
+loginButton.addEventListener('click', () => {
     const username = usernameInput.value.trim();
     const password = passwordInput.value.trim();
 
@@ -28,30 +24,26 @@ loginButton.addEventListener('click', async () => {
         alert('Please enter both username and password.');
         return;
     }
-    try {
-        // Dynamically construct the API URL
-        const host = window.location.hostname || 'localhost'; // Fallback to localhost
-        const response = await fetch(`http://${host}:5000/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
-        });
 
-        const result = await response.json();
-        if (result.success) {
-            currentUser = username;
-            loginPage.style.display = 'none';
-            chatScreen.style.display = 'block';
-            messageInput.disabled = false;
-            sendButton.disabled = false;
-            scrollToBottom();
-            alert(`Welcome, ${currentUser}!`);
+    // Simulate authentication (replace with actual API call later)
+    if (authenticateUser(username, password)) {
+        currentUser = username;
+        loginPage.style.display = 'none';
+        chatScreen.style.display = 'block';
+        messageInput.disabled = false;
+        sendButton.disabled = false;
+
+        // Scroll to the bottom of the chat history when entering the chat
+        setTimeout(scrollToBottom, 0); // Use setTimeout to ensure rendering is complete
+
+        // Display a warning for the test user
+        if (currentUser === 'test') {
+            alert(`Welcome, ${currentUser}! (This is a test account for development purposes.)`);
         } else {
-            alert(result.message || 'Invalid username or password.');
+            alert(`Welcome, ${currentUser}!`);
         }
-    } catch (error) {
-        console.error('Login error:', error);
-        alert('An error occurred during login. Please try again.');
+    } else {
+        alert('Invalid username or password.');
     }
 });
 
@@ -127,6 +119,10 @@ ws.onopen = () => {
 };
 
 ws.onmessage = (event) => {
+    // const messages = document.getElementById('messages');
+    // const message = document.createElement('div');
+    // message.textContent = event.data;
+    // messages.appendChild(message);
     if (event.data.startsWith('heartbeat')) {
         return;
     }

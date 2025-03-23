@@ -26,7 +26,6 @@ def authenticate_user(username, password):
     cursor.execute('SELECT password FROM users WHERE username = ?', (username,))
     row = cursor.fetchone()
     conn.close()
-
     if row and bcrypt.checkpw(password.encode('utf-8'), row[0]):
         return True
     return False
@@ -35,10 +34,17 @@ def authenticate_user(username, password):
 def add_user(username, password):
     conn = sqlite3.connect('securechat.db')
     cursor = conn.cursor()
-    cursor.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, hash_password(password)))
-    conn.commit()
+    # Check if the user already exists
+    cursor.execute('SELECT username FROM users WHERE username = ?', (username,))
+    if cursor.fetchone() is None:
+        # User does not exist, so add them
+        cursor.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, hash_password(password)))
+        conn.commit()
+        print(f"Added user: {username}")
+    else:
+        print(f"User '{username}' already exists in the database.")
     conn.close()
 
 # Initialize the database and add a test user
 init_db()
-add_user('user1', 'password123')
+add_user('user1', 'password123')  # This will now check if the user exists before adding

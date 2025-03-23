@@ -48,3 +48,5 @@ def add_user(username, password):
 # Initialize the database and add a test user
 init_db()
 add_user('user1', 'password123')  # This will now check if the user exists before adding
+add_user('user2', 'password456')  # New user
+add_user('user3', 'password789')  # Another new user

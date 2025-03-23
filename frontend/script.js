@@ -1,6 +1,7 @@
 // Our Websocket DOM element 
 // (set your own device local ip e.g. 192.168.xx.xx)
-const ws = new WebSocket('ws://192.168.68.64:8080');
+const wsUrl = 'wss://192.168.68.64:8080';
+const ws = new WebSocket(wsUrl);
 
 // Select DOM elements that we need for index.html
 const loginPage = document.getElementById('login-page');

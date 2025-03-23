@@ -9,6 +9,7 @@ import socket
 import http.server
 import socketserver
 import threading
+import ssl
 
 # Get local network IP of server
 def get_local_ip():
@@ -92,11 +93,25 @@ async def heartbeat(websocket, client_id):
             print(f"Client disconnected. Total clients: {len(connected_clients)}")
             break
 
+# Path to your SSL/TLS certificate and private key
+SSL_CERTFILE = r"G:\Grad School Projects\CPSC 455 - Web Security\CPSC_Project1--Client_Server_Communication_using_Web_Sockets\backend\cert.pem"
+SSL_KEYFILE = r"G:\Grad School Projects\CPSC 455 - Web Security\CPSC_Project1--Client_Server_Communication_using_Web_Sockets\backend\key.pem"
 
-# Start the WebSocket server
-start_server = websockets.serve(handle_connection, HOST, PORT)
+# Start the WebSocket server with SSL/TLS
+ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+ssl_context.load_cert_chain(certfile=SSL_CERTFILE, keyfile=SSL_KEYFILE)
 
-print("WebSocket server is running on ws://" + HOST + ":" + str(PORT))
+start_server = websockets.serve(
+    handle_connection,
+    HOST,
+    PORT,
+    ssl=ssl_context
+)
+
+# Start the WebSocket server OUR FIRST ATTEMPT
+# start_server = websockets.serve(handle_connection, HOST, PORT)
+
+print(f"WebSocket server is running on wss://{HOST}:{PORT}")
 
 # Run the server
 asyncio.get_event_loop().run_until_complete(start_server)

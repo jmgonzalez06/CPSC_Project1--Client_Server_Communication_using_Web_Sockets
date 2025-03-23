@@ -3,3 +3,5 @@ __pycache__/
 venv/
 securechat.db
 .env
+key.pem
+cert.pem

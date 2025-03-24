@@ -109,6 +109,64 @@ logoutButton.addEventListener('click', () => {
     loginPage.style.display = 'block';  //to insure login-page is visuable by default
 });
 
+
+
+// Text formatting functionality
+
+// Event listeners for buttons
+boldButton.addEventListener('click', () => {
+    formatText('bold');
+});
+
+italicsButton.addEventListener('click', () => {
+    formatText('italic');
+});
+
+underlineButton.addEventListener('click', () => {
+    formatText('underline');
+});
+
+// Logic to apply text formatting
+function formatText(style) {
+    const currentValue = messageInput.value;
+    let formattedText = '';
+
+    // Check if the text is already formatted
+    if (currentValue.startsWith(`**${style}**`) || currentValue.startsWith(`*${style}*`) || currentValue.startsWith(`_${style}_`)) {
+        // Remove the formatting
+        formattedText = currentValue.replace(`**${style}**`, '').replace(`*${style}*`, '').replace(`_${style}_`, '');
+    } else {
+        // Add the formatting
+        switch (style) {
+            case 'bold':
+                formattedText = `**${currentValue}**`;
+                break;
+            case 'italic':
+                formattedText = `*${currentValue}*`;
+                break;
+            case 'underline':
+                formattedText = `_${currentValue}_`;
+                break;
+            default:
+                formattedText = currentValue;
+        }
+    }
+
+    // Update the input field
+    messageInput.value = formattedText;
+}
+
+// Function to apply Mardkown Syntax
+function parseMarkdown(text) {
+    return text
+        .replace(/(\*\*(.*?)\*\*)/g, '<b>$2</b>')
+        .replace(/(\*(.*?)\*)/g, '<i>$2</i>')
+        .replace(/(_(.*?)_)/g, '<u>$2</u>');
+}
+
+// Emoji functionality
+const emojiList = document.getElementById('emoji-list');
+
 const emojis = ['🙂', '😀', '😄', '😎', '😍',
     '🙁', '😮', '😲', '😳', '😦',
     '😥', '😢', '😭', '😱', '😓',
@@ -129,9 +187,11 @@ emojiButton.addEventListener('click', () => {
     emojiMenu.style.display = emojiMenu.style.display === 'block' ? 'none' : 'block';
     console.log('New display:', emojiMenu.style.display);
 });
+
 closeEmojiMenuButton.addEventListener('click', () => {
     emojiMenu.style.display = 'none';
 });
+
 document.querySelectorAll('.emoji').forEach((emoji) => {
     emoji.addEventListener('click', () => {
         const cursorPosition = messageInput.selectionStart;
@@ -142,6 +202,7 @@ document.querySelectorAll('.emoji').forEach((emoji) => {
 });
 
 sendButton.addEventListener('click', sendMessage);
+
 messageInput.addEventListener('keypress', (event) => {
     if (event.key === 'Enter') {
         sendMessage();
@@ -152,6 +213,7 @@ messageInput.addEventListener('keypress', (event) => {
         event.target.value = '';
     }
 });
+
 logoutButton.addEventListener('click', () => {
     currentUser = null;
     chatHistory.innerHTML = '';
@@ -185,3 +247,11 @@ ws.onmessage = (event) => {
 ws.onclose = () => {
     console.log('Disconnected from the WebSocket server');
 };
+
+document.getElementById('message-input').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        const message = e.target.value;
+        ws.send(message);
+        e.target.value = '';
+    }
+});

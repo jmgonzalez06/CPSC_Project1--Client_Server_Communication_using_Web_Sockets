@@ -26,7 +26,14 @@
         <div id="chat-history"></div>
         <div id="chat-input">
             <input type="text" id="message-input" placeholder="Type a message..." disabled>
+            <button id="emoji-button">🙂</button>
             <button id="send-button" disabled>Send</button> <!-- Send Button Created -->
+            <div id="emoji-menu" style="display: none;">
+                <button id="close-emoji-menu-button">X</button>
+                <div id="emoji-list">
+                  <!-- Emoji list populates here -->
+                </div>
+              </div>      
         </div>
     </div>
     <script src="script.js"></script>

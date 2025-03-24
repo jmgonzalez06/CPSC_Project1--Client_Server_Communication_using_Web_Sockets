@@ -1,6 +1,8 @@
 // Our Websocket DOM element 
-// (set your own device local ip e.g. 192.168.xx.xx)
-const ws = new WebSocket('ws://192.168.68.64:8080');
+// Dynamically retrieves IP address
+const host = window.location.hostname;
+const wsUrl = `ws://${host}:8080`;
+const ws = new WebSocket(wsUrl);
 
 // Select DOM elements that we need for index.html
 const loginPage = document.getElementById('login-page');
@@ -12,6 +14,9 @@ const chatHistory = document.getElementById('chat-history');
 const messageInput = document.getElementById('message-input');
 const sendButton = document.getElementById('send-button');
 const logoutButton = document.getElementById('logout-button');
+const emojiButton = document.getElementById('emoji-button');
+const emojiMenu = document.getElementById('emoji-menu');
+const closeEmojiMenuButton = document.getElementById('close-emoji-menu-button');
 
 let currentUser = null;
 
@@ -109,6 +114,43 @@ logoutButton.addEventListener('click', () => {
     loginPage.style.display = 'block';  //to insure login-page is visuable by default
 });
 
+// Emoji list population
+const emojiList = document.getElementById('emoji-list');
+
+const emojis = ['🙂', '😀', '😄', '😎', '😍',
+    '🙁', '😮', '😲', '😳', '😦',
+    '😥', '😢', '😭', '😱', '😓',
+    '🥰', '😋', '🤪', '😛', '😜',
+    '😂', '🤭', '🤫', '🤨', '😐',
+    '😒', '🙄', '😬', '🤢', '🤮',
+    '🥶', '🥴', '💀', '🤡', '💩',];
+
+emojis.forEach((emoji) => {
+    const emojiElement = document.createElement('span');
+    emojiElement.textContent = emoji;
+    emojiElement.className = 'emoji';
+    emojiList.appendChild(emojiElement);
+});
+
+// Event listeners to display Emoji menu
+emojiButton.addEventListener('click', () => {
+    emojiMenu.style.display = 'block';
+});
+
+closeEmojiMenuButton.addEventListener('click', () => {
+    emojiMenu.style.display = 'none';
+});
+
+// Add event listener to each emoji
+document.querySelectorAll('.emoji').forEach((emoji) => {
+    emoji.addEventListener('click', () => {
+        const cursorPosition = messageInput.selectionStart;
+        messageInput.value = messageInput.value.substring(0, cursorPosition) + emoji.textContent + messageInput.value.substring(cursorPosition);
+        messageInput.focus();
+        emojiMenu.style.display = 'none';
+    });
+});
+
 ws.onopen = () => {
     console.log('Connected to the WebSocket server');
     console.log(wsUrl)
@@ -119,10 +161,6 @@ ws.onopen = () => {
 };
 
 ws.onmessage = (event) => {
-    // const messages = document.getElementById('messages');
-    // const message = document.createElement('div');
-    // message.textContent = event.data;
-    // messages.appendChild(message);
     if (event.data.startsWith('heartbeat')) {
         return;
     }

@@ -18,6 +18,7 @@ const logoutButton = document.getElementById('logout-button');
 const emojiButton = document.getElementById('emoji-button');
 const emojiMenu = document.getElementById('emoji-menu');
 const closeEmojiMenuButton = document.getElementById('close-emoji-menu-button');
+const emojiList = document.getElementById('emoji-list');
 
 let currentUser = null;
 
@@ -107,39 +108,96 @@ logoutButton.addEventListener('click', () => {
 });
 
 // Emoji list population
-const emojiList = document.getElementById('emoji-list');
+// Wait for DOM to load
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM fully loaded');
+    console.log('loginPage:', loginPage);
+    console.log('chatScreen:', chatScreen);
+    console.log('emojiButton:', emojiButton);
+    console.log('emojiMenu:', emojiMenu);
+    console.log('emojiList:', emojiList);
+    console.log('closeEmojiMenuButton:', closeEmojiMenuButton);
+    console.log('sendButton:', sendButton);
 
-const emojis = ['🙂', '😀', '😄', '😎', '😍',
-    '🙁', '😮', '😲', '😳', '😦',
-    '😥', '😢', '😭', '😱', '😓',
-    '🥰', '😋', '🤪', '😛', '😜',
-    '😂', '🤭', '🤫', '🤨', '😐',
-    '😒', '🙄', '😬', '🤢', '🤮',
-    '🥶', '🥴', '💀', '🤡', '💩',];
+    if (!emojiList) {
+        console.error('emojiList element not found in DOM');
+        return;
+    }
+    if (!emojiButton) {
+        console.error('emojiButton element not found in DOM');
+        return;
+    }
+    if (!emojiMenu) {
+        console.error('emojiMenu element not found in DOM');
+        return;
+    }
+    if (!closeEmojiMenuButton) {
+        console.error('closeEmojiMenuButton element not found in DOM');
+        return;
+    }
+    if (!sendButton) {
+        console.error('sendButton element not found in DOM');
+        return;
+    }
+    if (!messageInput) {
+        console.error('messageInput element not found in DOM');
+        return;
+    }
+    if (!logoutButton) {
+        console.error('logoutButton element not found in DOM');
+        return;
+    }
 
-emojis.forEach((emoji) => {
-    const emojiElement = document.createElement('span');
-    emojiElement.textContent = emoji;
-    emojiElement.className = 'emoji';
-    emojiList.appendChild(emojiElement);
-});
+    const emojis = ['🙂', '😀', '😄', '😎', '😍',
+        '🙁', '😮', '😲', '😳', '😦',
+        '😥', '😢', '😭', '😱', '😓',
+        '🥰', '😋', '🤪', '😛', '😜',
+        '😂', '🤭', '🤫', '🤨', '😐',
+        '😒', '🙄', '😬', '🤢', '🤮',
+        '🥶', '🥴', '💀', '🤡', '💩',];
+    emojis.forEach((emoji) => {
+        const emojiElement = document.createElement('span');
+        emojiElement.textContent = emoji;
+        emojiElement.className = 'emoji';
+        emojiList.appendChild(emojiElement);
+    });
 
-// Event listeners to display Emoji menu
-emojiButton.addEventListener('click', () => {
-    emojiMenu.style.display = 'block';
-});
-
-closeEmojiMenuButton.addEventListener('click', () => {
-    emojiMenu.style.display = 'none';
-});
-
-// Add event listener to each emoji
-document.querySelectorAll('.emoji').forEach((emoji) => {
-    emoji.addEventListener('click', () => {
-        const cursorPosition = messageInput.selectionStart;
-        messageInput.value = messageInput.value.substring(0, cursorPosition) + emoji.textContent + messageInput.value.substring(cursorPosition);
-        messageInput.focus();
+    emojiButton.addEventListener('click', () => {
+        console.log('Emoji button clicked, current display:', emojiMenu.style.display);
+        emojiMenu.style.display = emojiMenu.style.display === 'block' ? 'none' : 'block';
+        console.log('New display:', emojiMenu.style.display);
+    });
+    closeEmojiMenuButton.addEventListener('click', () => {
         emojiMenu.style.display = 'none';
+    });
+    document.querySelectorAll('.emoji').forEach((emoji) => {
+        emoji.addEventListener('click', () => {
+            const cursorPosition = messageInput.selectionStart;
+            messageInput.value = messageInput.value.substring(0, cursorPosition) + emoji.textContent + messageInput.value.substring(cursorPosition);
+            messageInput.focus();
+            emojiMenu.style.display = 'none';
+        });
+    });
+
+    sendButton.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') {
+            sendMessage();
+        }
+        if (event.key === 'Enter') {
+            const message = event.target.value;
+            ws.send(message);
+            event.target.value = '';
+        }
+    });
+    logoutButton.addEventListener('click', () => {
+        currentUser = null;
+        chatHistory.innerHTML = '';
+        messageInput.value = '';
+        messageInput.disabled = true;
+        sendButton.disabled = true;
+        chatScreen.style.display = 'none';
+        loginPage.style.display = 'block';
     });
 });
 
@@ -166,11 +224,3 @@ ws.onmessage = (event) => {
 ws.onclose = () => {
     console.log('Disconnected from the WebSocket server');
 };
-
-document.getElementById('message-input').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        const message = e.target.value;
-        ws.send(message);
-        e.target.value = '';
-    }
-});

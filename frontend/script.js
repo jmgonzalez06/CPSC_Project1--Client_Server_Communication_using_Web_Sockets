@@ -1,7 +1,8 @@
 // Our Websocket DOM element 
 // Dynamically retrieves IP address
 const host = window.location.hostname;
-const wsUrl = `ws://${host}:8080`;
+console.log('host is trying to connect to: ', host);
+const wsUrl = `ws://${host}:8080`; //Update to wss when possible
 const ws = new WebSocket(wsUrl);
 
 // Select DOM elements that we need for index.html
@@ -20,8 +21,8 @@ const closeEmojiMenuButton = document.getElementById('close-emoji-menu-button');
 
 let currentUser = null;
 
-// Login functionality
-loginButton.addEventListener('click', () => {
+// Login functionality with server-side authentication
+loginButton.addEventListener('click', async () => {
     const username = usernameInput.value.trim();
     const password = passwordInput.value.trim();
 
@@ -30,39 +31,30 @@ loginButton.addEventListener('click', () => {
         return;
     }
 
-    // Simulate authentication (replace with actual API call later)
-    if (authenticateUser(username, password)) {
-        currentUser = username;
-        loginPage.style.display = 'none';
-        chatScreen.style.display = 'block';
-        messageInput.disabled = false;
-        sendButton.disabled = false;
+    try {
+        const response = await fetch(`http://${host}:5000/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        const result = await response.json();
 
-        // Scroll to the bottom of the chat history when entering the chat
-        setTimeout(scrollToBottom, 0); // Use setTimeout to ensure rendering is complete
-
-        // Display a warning for the test user
-        if (currentUser === 'test') {
-            alert(`Welcome, ${currentUser}! (This is a test account for development purposes.)`);
-        } else {
+        if (result.success) {
+            currentUser = username;
+            loginPage.style.display = 'none';
+            chatScreen.style.display = 'block';
+            messageInput.disabled = false;
+            sendButton.disabled = false;
+            setTimeout(scrollToBottom, 0);
             alert(`Welcome, ${currentUser}!`);
+        } else {
+            alert(result.message || 'Invalid username or password.');
         }
-    } else {
-        alert('Invalid username or password.');
+    } catch (error) {
+        console.error('Login error:', error);
+        alert('An error occurred during login. Please try again.');
     }
 });
-
-// Simulated authentication function
-function authenticateUser(username, password) {
-    // Hardcoded users for POC (including the test user)
-    const users = {
-        user1: 'pass1',
-        user2: 'pass2',
-        test: 'test' // Test user added here to test login page
-    };
-    return users[username] === password;
-}
-
 
 // Send message functionality
 function sendMessage() {
@@ -151,6 +143,10 @@ document.querySelectorAll('.emoji').forEach((emoji) => {
     });
 });
 
+ws.onerror = (error) => {
+    console.error('WebSocket error:', error);
+};
+
 ws.onopen = () => {
     console.log('Connected to the WebSocket server');
     console.log(wsUrl)
@@ -171,7 +167,6 @@ ws.onclose = () => {
     console.log('Disconnected from the WebSocket server');
 };
 
-document.getElementById('messageInput').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
         const message = e.target.value;
         ws.send(message);

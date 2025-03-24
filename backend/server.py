@@ -12,8 +12,18 @@ import threading
 
 # Get local network IP of server
 def get_local_ip():
-    hostname = socket.gethostname()
-    return socket.gethostbyname(hostname)
+    try:
+        # Create a socket and connect to an external server (Google DNS)
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('8.8.8.8', 80))  # Doesn’t send data, just binds to the right interface
+        ip = s.getsockname()[0]
+        s.close()
+        print(f"Selected IP: {ip}")
+        return ip
+    except Exception as e:
+        print(f"Error detecting IP: {e}")
+        # Fallback to hostname resolution
+        return socket.gethostbyname(socket.gethostname())
 
 # Store connected clients
 connected_clients = set()

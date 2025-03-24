@@ -131,7 +131,7 @@ button:hover {
 #emoji-menu {
     position: absolute;
     top: 100%;
-    left: 200px;
+    left: auto;
     margin-top: 5px;
     margin-right: 0px;
     background-color: #ffffff;

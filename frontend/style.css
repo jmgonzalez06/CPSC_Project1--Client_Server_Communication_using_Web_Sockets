@@ -102,9 +102,12 @@ button:hover {
 #chat-input {
     display: flex;
     flex-direction: row;
+    width: 100%;
     padding: 10px;
     background-color: #ffffff;
     /* White background */
+    border-radius: 10px;
+    box-sizing: border-box;
 }
 
 #message-input {
@@ -119,12 +122,14 @@ button:hover {
 
 #send-button {
     background-color: #007bff;
+    padding: 3px;
     /* Keep the send button blue */
 }
 
 /* Emoji Styling */
 #emoji-button {
     background-color: #007bff;
+    padding: 3px;
 }
 
 /* Emoji UI */
@@ -163,4 +168,19 @@ button:hover {
     font-size: 32px;
     cursor: pointer;
     margin: 5px;
+}
+
+#bold-button {
+    font-weight: bold;
+    padding: 10px;
+}
+
+#italics-button {
+    font-style: italic;
+    padding: 10px;
+}
+
+#underline-button {
+    text-decoration: underline;
+    padding: 10px;
 }

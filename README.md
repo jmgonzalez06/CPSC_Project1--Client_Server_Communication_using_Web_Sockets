@@ -15,9 +15,9 @@ python ./backend/server.py
 # Change IP to your network. Need to be connected to same network.
 
 # Test User Login Info
-# User 1 : user1, password123
-# User 2 : user2, password456
-# User 3 : user3, password789
+User 1 : user1, password123
+User 2 : user2, password456
+User 3 : user3, password789
 
 # CPSC_Project1--Client_Server_Communication_using_Web_Sockets
 

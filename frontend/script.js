@@ -167,6 +167,7 @@ ws.onclose = () => {
     console.log('Disconnected from the WebSocket server');
 };
 
+document.getElementById('message-input').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
         const message = e.target.value;
         ws.send(message);

@@ -143,8 +143,7 @@ ssl_context.load_cert_chain(certfile=SSL_CERTFILE, keyfile=SSL_KEYFILE)
 
 # Start WebSocket server without SSL
 start_server = websockets.serve(handle_connection, HOST, PORT)
-
-print("WebSocket server is running on ws://" + HOST + ":" + str(PORT))
+print(f"WebSocket server is running on ws://{HOST}:{PORT}")
 
 # Run the server
 asyncio.get_event_loop().run_until_complete(start_server)

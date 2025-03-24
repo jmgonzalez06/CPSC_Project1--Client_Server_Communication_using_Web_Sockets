@@ -11,7 +11,7 @@
 python ./backend/server.py
 
 # To connect on another device, use the URL
-# http://<HOST IP>/frontend/index.html
+# http://"HOST IP ADDRESS"/frontend/index.html
 # Change IP to your network. Need to be connected to same network.
 
 # Test User Login Info

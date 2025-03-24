@@ -5,5 +5,3 @@ securechat.db
 .env
 key.pem
 cert.pem
-backendkey.pem
-backendcert.pem

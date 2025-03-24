@@ -73,17 +73,28 @@ function sendMessage() {
 // Add a message to the chat history
 function addMessageToChat(message) {
     const messageElement = document.createElement('div');
-    messageElement.textContent = message;
-    chatHistory.appendChild(messageElement); //line 26 in index
-
-    // Scroll to the bottom after adding a new message
+    const username = message.split(':')[0].trim();
+    let messageContent = message.substring(message.indexOf(':') + 1).trim();
+    messageContent = messageContent.replace(/:+$/, '');
+    if (!messageContent) return;
+    messageElement.textContent = messageContent;
+    messageElement.setAttribute('data-username', username + ':');
+    if (username === currentUser) {
+        messageElement.classList.add('self');
+    } else {
+        messageElement.classList.add('others');
+    }
+    chatHistory.appendChild(messageElement);
     scrollToBottom();
 }
 
 // Function to scroll chat history to the bottom, since it was being added to the top at first
 function scrollToBottom() {
-    // Ensure the chat history scrolls to the bottom. I still need to figure out how to get it to start near the text box
-    chatHistory.scrollTop = chatHistory.scrollHeight;
+    setTimeout(() => {
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+        console.log('Scrolled to bottom, scrollTop:', chatHistory.scrollTop, 'scrollHeight:', chatHistory.scrollHeight);
+        console.log('Chat history clientHeight:', chatHistory.clientHeight);
+    }, 0);
 }
 
 // Event listener for the Send button
@@ -154,7 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
         '🥰', '😋', '🤪', '😛', '😜',
         '😂', '🤭', '🤫', '🤨', '😐',
         '😒', '🙄', '😬', '🤢', '🤮',
-        '🥶', '🥴', '💀', '🤡', '💩',];
+        '🥶', '🥴', '💀', '🤡', '💩'];
     emojis.forEach((emoji) => {
         const emojiElement = document.createElement('span');
         emojiElement.textContent = emoji;
@@ -164,12 +175,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     emojiButton.addEventListener('click', () => {
         console.log('Emoji button clicked, current display:', emojiMenu.style.display);
-        emojiMenu.style.display = emojiMenu.style.display === 'block' ? 'none' : 'block';
+        const newDisplay = emojiMenu.style.display === 'block' ? 'none' : 'block';
+        emojiMenu.style.display = newDisplay;
         console.log('New display:', emojiMenu.style.display);
+        console.log('Emoji menu visibility:', window.getComputedStyle(emojiMenu).visibility);
+        console.log('Emoji menu position:', emojiMenu.getBoundingClientRect());
+        console.log('Emoji menu display (computed):', window.getComputedStyle(emojiMenu).display);
     });
+
     closeEmojiMenuButton.addEventListener('click', () => {
         emojiMenu.style.display = 'none';
     });
+
     document.querySelectorAll('.emoji').forEach((emoji) => {
         emoji.addEventListener('click', () => {
             const cursorPosition = messageInput.selectionStart;
@@ -179,15 +196,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Removed duplicate event listeners for sendButton and messageInput
+});
+
     sendButton.addEventListener('click', sendMessage);
     messageInput.addEventListener('keypress', (event) => {
         if (event.key === 'Enter') {
             sendMessage();
-        }
-        if (event.key === 'Enter') {
-            const message = event.target.value;
-            ws.send(message);
-            event.target.value = '';
         }
     });
     logoutButton.addEventListener('click', () => {
@@ -199,7 +214,6 @@ document.addEventListener('DOMContentLoaded', () => {
         chatScreen.style.display = 'none';
         loginPage.style.display = 'block';
     });
-});
 
 ws.onerror = (error) => {
     console.error('WebSocket error:', error);

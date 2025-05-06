@@ -68,6 +68,16 @@ async def handle_connection(websocket, path):
     # Save the username for this connection
     usernames[websocket] = username
     print(f"[WebSocket] User '{username}' connected. Total: {len(connected_clients)+1}")
+    
+    # Notify others that this user is now online
+    status_message = json.dumps({
+        "type": "status",
+        "user": username,
+        "status": "online"
+    })
+    for client in connected_clients:
+        if client != websocket and client.open:
+            await client.send(status_message)
 
     client_id = id(websocket)
     client_msg_freq[client_id] = (time.time(), 0)
@@ -96,10 +106,23 @@ async def handle_connection(websocket, path):
                     await client.send(formatted_message)
 
     except websockets.ConnectionClosed:
-        print("[WebSocket] Client disconnected.")
-        usernames.pop(websocket, None) # That cleans up the usernames dictionary when a user disconnects.
+        # Get the username before removing them
+        disconnecting_user = usernames.pop(websocket, "unknown")
         connected_clients.discard(websocket)
 
+        # Notify remaining users that this user went offline
+        status_message = json.dumps({
+            "type": "status",
+            "user": disconnecting_user,
+            "status": "offline"
+        })
+        for client in connected_clients:
+            if client.open:
+                await client.send(status_message)
+
+        print(f"[WebSocket] User '{disconnecting_user}' disconnected. Total clients: {len(connected_clients)}")
+
+        
 async def heartbeat(websocket, client_id):
     while True:
         try:

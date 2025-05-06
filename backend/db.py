@@ -1,4 +1,4 @@
-import mysql.connector  # MySQL client library
+import mysql.connector  # type: ignore MySQL client library
 import bcrypt           # For secure password hashing
 import os
 from dotenv import load_dotenv

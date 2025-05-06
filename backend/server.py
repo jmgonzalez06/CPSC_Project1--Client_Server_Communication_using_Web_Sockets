@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from db import authenticate_user, hash_password
+from urllib.parse import urlparse, parse_qs # This will let us extract the user query parameter from the WebSocket URL
 
 # =============================
 # Server Configuration
@@ -33,6 +34,7 @@ MYSQL_CONFIG = {
 }
 
 connected_clients = set()
+usernames = {} # Track usernames in a global dict
 client_msg_freq = {}
 RATE_LIMIT_INTERVAL = 5
 RATE_LIMIT_THRESHOLD = 5
@@ -53,6 +55,20 @@ async def handle_connection(websocket, path):
     connected_clients.add(websocket)
     print(f"[WebSocket] New client connected. Total: {len(connected_clients)}")
 
+    # Parse the username from the WebSocket path
+    parsed = urlparse(path)
+    query = parse_qs(parsed.query)
+    username = query.get("user", [None])[0]
+
+    if not username:
+        print("[WebSocket] Connection rejected: no username provided.")
+        await websocket.close()
+        return
+
+    # Save the username for this connection
+    usernames[websocket] = username
+    print(f"[WebSocket] User '{username}' connected. Total: {len(connected_clients)+1}")
+
     client_id = id(websocket)
     client_msg_freq[client_id] = (time.time(), 0)
     asyncio.create_task(heartbeat(websocket, client_id))
@@ -69,11 +85,19 @@ async def handle_connection(websocket, path):
                 client_msg_freq[client_id] = (time.time(), 1)
 
             print(f"[Message] {message}")
+            
+            # Format the message with the sender's username
+            sender = usernames.get(websocket, "unknown")
+            formatted_message = json.dumps({"user": sender, "message": message})
+
+            # Send to all connected clients except the sender
             for client in connected_clients:
                 if client != websocket and client.open:
-                    await client.send(message)
+                    await client.send(formatted_message)
+
     except websockets.ConnectionClosed:
         print("[WebSocket] Client disconnected.")
+        usernames.pop(websocket, None) # That cleans up the usernames dictionary when a user disconnects.
         connected_clients.discard(websocket)
 
 async def heartbeat(websocket, client_id):

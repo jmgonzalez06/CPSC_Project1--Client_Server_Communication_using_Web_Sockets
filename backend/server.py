@@ -14,6 +14,7 @@ import bcrypt
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask import send_from_directory
 from db import authenticate_user, hash_password
 from urllib.parse import urlparse, parse_qs # This will let us extract the user query parameter from the WebSocket URL
 
@@ -23,6 +24,9 @@ from urllib.parse import urlparse, parse_qs # This will let us extract the user 
 load_dotenv()
 HOST = socket.gethostbyname(socket.gethostname())
 PORT = int(os.getenv("PORT", 8080))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SSL_CERTFILE = os.path.join(BASE_DIR, "cert.pem")
+SSL_KEYFILE = os.path.join(BASE_DIR, "key.pem")
 
 # MySQL config
 MYSQL_CONFIG = {
@@ -45,6 +49,8 @@ PORT_HTTP = 8081
 # =============================
 # HTTP Static File Server
 # =============================
+web_dir = os.path.join(BASE_DIR, '../frontend')
+os.chdir(web_dir)
 httpd = socketserver.TCPServer(("", PORT_HTTP), http.server.SimpleHTTPRequestHandler)
 print(f"[INFO] HTTP static server running on port {PORT_HTTP}")
 threading.Thread(target=httpd.serve_forever, daemon=True).start()
@@ -234,16 +240,30 @@ def register():
             cursor.close()
             conn.close()
 
+UPLOAD_DIR = os.path.join(BASE_DIR, 'uploads')
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    file = request.files.get('file')
+    if not file:
+        return jsonify({'success': False, 'message': 'No file received'}), 400
+
+    file_path = os.path.join(UPLOAD_DIR, file.filename)
+    file.save(file_path)
+    file_url = f"http://{HOST}:5000/uploads/{file.filename}"
+    return jsonify({'success': True, 'url': file_url}), 200
+
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(UPLOAD_DIR, filename)
+
 # Start Flask API thread
 threading.Thread(target=lambda: app.run(host='0.0.0.0', port=5000, debug=False), daemon=True).start()
 
 # =============================
 # WebSocket SSL (Still Placeholder for Now)
 # =============================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SSL_CERTFILE = os.path.join(BASE_DIR, "cert.pem")
-SSL_KEYFILE = os.path.join(BASE_DIR, "key.pem")
-
 if not os.path.exists(SSL_CERTFILE) or not os.path.exists(SSL_KEYFILE):
     raise FileNotFoundError("cert.pem or key.pem missing.")
 

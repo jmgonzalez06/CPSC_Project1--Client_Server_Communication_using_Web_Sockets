@@ -21,6 +21,8 @@ const closeEmojiMenuButton = document.getElementById('close-emoji-menu-button');
 const boldButton = document.getElementById('bold-button');
 const italicsButton = document.getElementById('italics-button');
 const underlineButton = document.getElementById('underline-button');
+const fileButton = document.getElementById('file-button');
+const fileInput = document.getElementById('file-input');
 
 let currentUser = null;
 
@@ -272,6 +274,38 @@ ws.onmessage = (event) => {
         console.error("Invalid JSON received:", event.data);
     }
 };
+
+fileButton.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', async () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const res = await fetch(`http://${host}:5000/upload`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await res.json();
+        if (result.success) {
+            const fileLink = result.url;
+            ws.send(JSON.stringify({
+                type: "message",
+                user: currentUser,
+                message: `Shared a file: ${fileLink}`
+            }));            
+        } else {
+            alert('File upload failed');
+        }
+    } catch (err) {
+        console.error('File upload error:', err);
+        alert('Error uploading file');
+    }
+});
 
 ws.onclose = () => {
     console.log('Disconnected from the WebSocket server');

@@ -140,7 +140,7 @@ def register():
         return jsonify({'success': False, 'message': 'Database error'}), 500
 
     finally:
-        if conn.is_connected():
+        if 'conn' in locals() and conn.is_connected():
             cursor.close()
             conn.close()
 

@@ -59,13 +59,18 @@ loginButton.addEventListener('click', async () => {
     }
 });
 
-// Send message functionality
+// Sends a message as a JSON object to the server
+// This is the main chat message payload used by both raw input and Enter key
 function sendMessage() {
     const message = messageInput.value.trim();
     if (!message) return;
 
     // Send message with WebSocket send
-    ws.send(`${currentUser}: ${message}`);
+    ws.send(JSON.stringify({
+        type: "message",
+        user: currentUser,
+        message: message
+    }));    
     messageInput.value = '';
 
     // Add user's message to chat history
@@ -88,13 +93,16 @@ function scrollToBottom() {
     chatHistory.scrollTop = chatHistory.scrollHeight;
 }
 
-// Event listener for the Send button
-sendButton.addEventListener('click', sendMessage);
-
 // Event listener for the Enter key in the message input as this would make it easier to test over only click listener on send button
 messageInput.addEventListener('keypress', (event) => {
     if (event.key === 'Enter') {
         sendMessage();
+    } else {
+        // Notify others that this user is typing
+        ws.send(JSON.stringify({
+            type: "typing",
+            user: currentUser
+        }));
     }
 });
 
@@ -237,21 +245,34 @@ ws.onopen = () => {
     }, 10000); // 10 sec interval
 };
 
+// Handle incoming WebSocket messages: status updates, typing, or chat
 ws.onmessage = (event) => {
-    if (event.data.startsWith('heartbeat')) {
-        return;
+    if (event.data.startsWith('heartbeat')) return;
+
+    try {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "message") {
+            const message = data.user === currentUser
+                ? `<span style="color: orange;">You</span>: ${parseMarkdown(data.message)}`
+                : `<span style="color: blue;">${data.user}</span>: ${parseMarkdown(data.message)}`;
+            addMessageToChat(message);
+        }
+
+        if (data.type === "typing") {
+            console.log(`${data.user} is typing...`);
+            // Later: Show a "typing..." label in the UI
+        }
+
+        if (data.type === "status") {
+            const statusText = `${data.user} is ${data.status}`;
+            addMessageToChat(`<i style="color: gray;">${statusText}</i>`);
+        }
+    } catch (e) {
+        console.error("Invalid JSON received:", event.data);
     }
-    addMessageToChat(event.data);
 };
 
 ws.onclose = () => {
     console.log('Disconnected from the WebSocket server');
 };
-
-document.getElementById('message-input').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        const message = e.target.value;
-        ws.send(message);
-        e.target.value = '';
-    }
-});

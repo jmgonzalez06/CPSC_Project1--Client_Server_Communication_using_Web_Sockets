@@ -169,6 +169,7 @@ function formatText(style) {
 // Function to apply Mardkown Syntax
 function parseMarkdown(text) {
     return text
+        .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>') // links
         .replace(/(\*\*(.*?)\*\*)/g, '<b>$2</b>')
         .replace(/(\*(.*?)\*)/g, '<i>$2</i>')
         .replace(/(_(.*?)_)/g, '<u>$2</u>');
@@ -296,8 +297,8 @@ fileInput.addEventListener('change', async () => {
             ws.send(JSON.stringify({
                 type: "message",
                 user: currentUser,
-                message: `Shared a file: ${fileLink}`
-            }));            
+                message: `Shared a file: [${file.name}](${fileLink})`
+            }));                       
         } else {
             alert('File upload failed');
         }

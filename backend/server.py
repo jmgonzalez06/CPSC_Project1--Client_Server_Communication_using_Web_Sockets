@@ -55,7 +55,7 @@ async def handle_connection(websocket, path):
     connected_clients.add(websocket)
     print(f"[WebSocket] New client connected. Total: {len(connected_clients)}")
 
-    # Parse the username from the WebSocket path
+    # Parse the username from the WebSocket URL query string
     parsed = urlparse(path)
     query = parse_qs(parsed.query)
     username = query.get("user", [None])[0]
@@ -65,11 +65,10 @@ async def handle_connection(websocket, path):
         await websocket.close()
         return
 
-    # Save the username for this connection
     usernames[websocket] = username
     print(f"[WebSocket] User '{username}' connected. Total: {len(connected_clients)+1}")
-    
-    # Notify others that this user is now online
+
+    # Broadcast online presence
     status_message = json.dumps({
         "type": "status",
         "user": username,
@@ -84,33 +83,54 @@ async def handle_connection(websocket, path):
     asyncio.create_task(heartbeat(websocket, client_id))
 
     try:
-        async for message in websocket:
-            timestamp, freq = client_msg_freq[client_id]
-            if time.time() - timestamp < RATE_LIMIT_INTERVAL:
-                if freq >= RATE_LIMIT_THRESHOLD:
-                    await websocket.send("Rate limit exceeded. Please wait.")
-                    continue
-                client_msg_freq[client_id] = (timestamp, freq + 1)
-            else:
-                client_msg_freq[client_id] = (time.time(), 1)
-
-            print(f"[Message] {message}")
-            
-            # Format the message with the sender's username
+        async for raw_message in websocket:
             sender = usernames.get(websocket, "unknown")
-            formatted_message = json.dumps({"user": sender, "message": message})
 
-            # Send to all connected clients except the sender
-            for client in connected_clients:
-                if client != websocket and client.open:
-                    await client.send(formatted_message)
+            try:
+                # Attempt to parse incoming message as JSON
+                data = json.loads(raw_message)
+                msg_type = data.get("type")
+
+                if msg_type == "typing":
+                    typing_notice = json.dumps({
+                        "type": "typing",
+                        "user": sender
+                    })
+                    for client in connected_clients:
+                        if client != websocket and client.open:
+                            await client.send(typing_notice)
+
+                elif msg_type == "message":
+                    message_content = data.get("message", "")
+                    print(f"[Message] {message_content}")
+
+                    formatted_message = json.dumps({
+                        "type": "message",
+                        "user": sender,
+                        "message": message_content
+                    })
+                    for client in connected_clients:
+                        if client != websocket and client.open:
+                            await client.send(formatted_message)
+
+            except json.JSONDecodeError:
+                # Handle raw string fallback
+                message_content = raw_message.strip()
+                print(f"[Message] {message_content} (fallback)")
+
+                formatted_message = json.dumps({
+                    "type": "message",
+                    "user": sender,
+                    "message": message_content
+                })
+                for client in connected_clients:
+                    if client != websocket and client.open:
+                        await client.send(formatted_message)
 
     except websockets.ConnectionClosed:
-        # Get the username before removing them
         disconnecting_user = usernames.pop(websocket, "unknown")
         connected_clients.discard(websocket)
 
-        # Notify remaining users that this user went offline
         status_message = json.dumps({
             "type": "status",
             "user": disconnecting_user,

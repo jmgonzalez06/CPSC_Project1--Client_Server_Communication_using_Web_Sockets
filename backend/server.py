@@ -36,6 +36,7 @@ MYSQL_CONFIG = {
 connected_clients = set()
 usernames = {} # Track usernames in a global dict
 client_msg_freq = {}
+chat_history = []  # Store recent chat messages in memory
 RATE_LIMIT_INTERVAL = 5
 RATE_LIMIT_THRESHOLD = 5
 HEARTBEAT_FREQ = 10
@@ -67,6 +68,9 @@ async def handle_connection(websocket, path):
 
     usernames[websocket] = username
     print(f"[WebSocket] User '{username}' connected. Total: {len(connected_clients)+1}")
+    # Send chat history to the newly connected user
+    for past_message in chat_history:
+        await websocket.send(json.dumps(past_message))
 
     # Broadcast online presence
     status_message = json.dumps({
@@ -103,8 +107,26 @@ async def handle_connection(websocket, path):
                 elif msg_type == "message":
                     message_content = data.get("message", "")
                     print(f"[Message] {message_content}")
+                    # Handle command to clear chat history
+                    if message_content.strip() == "/clear-h":
+                        chat_history.clear()
+                        clear_notice = json.dumps({
+                            "type": "status",
+                            "user": sender,
+                            "status": "cleared the chat history"
+                        })
+                        for client in connected_clients:
+                            if client.open:
+                                await client.send(clear_notice)
+                        return  # Exit early so nothing else is sent
 
                     formatted_message = json.dumps({
+                        "type": "message",
+                        "user": sender,
+                        "message": message_content
+                    })
+                    # Save message to chat history
+                    chat_history.append({
                         "type": "message",
                         "user": sender,
                         "message": message_content

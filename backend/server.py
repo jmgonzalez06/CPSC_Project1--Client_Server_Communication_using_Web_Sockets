@@ -8,13 +8,13 @@ import http.server
 import socketserver
 import threading
 import ssl
-import mysql.connector  # For MySQL
+import mysql.connector  # type: ignore # For MySQL
 import bcrypt
 
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from db import authenticate_user  # still uses SQLite for now
+from db import authenticate_user, hash_password
 
 # =============================
 # Server Configuration
@@ -74,7 +74,7 @@ async def handle_connection(websocket, path):
                     await client.send(message)
     except websockets.ConnectionClosed:
         print("[WebSocket] Client disconnected.")
-        connected_clients.remove(websocket)
+        connected_clients.discard(websocket)
 
 async def heartbeat(websocket, client_id):
     while True:
@@ -82,10 +82,11 @@ async def heartbeat(websocket, client_id):
             await websocket.ping()
             await asyncio.sleep(HEARTBEAT_FREQ)
         except websockets.ConnectionClosed:
-            connected_clients.remove(websocket)
             client_msg_freq.pop(client_id, None)
-            print(f"[WebSocket] Client {client_id} removed.")
+            connected_clients.discard(websocket)
+            print(f"[WebSocket] Client disconnected. Total clients: {len(connected_clients)}")
             break
+
 
 # =============================
 # Flask API (Login / Register)
@@ -95,7 +96,7 @@ CORS(app)
 
 @app.route('/login', methods=['POST'])
 def login():
-    """Login using the old SQLite-based function (to be migrated)"""
+    """Login using MySQL-backed authentication via db.py"""
     data = request.json
     username = data.get('username')
     password = data.get('password')
@@ -129,8 +130,8 @@ def register():
             return jsonify({'success': False, 'message': 'Username already exists.'}), 409
 
         # Insert new user
-        hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-        cursor.execute("INSERT INTO users (username, password) VALUES (%s, %s)", (username, hashed.decode('utf-8')))
+        hashed = hash_password(password)
+        cursor.execute("INSERT INTO users (username, password) VALUES (%s, %s)", (username, hashed))
         conn.commit()
 
         return jsonify({'success': True, 'message': 'User registered successfully.'}), 201
@@ -165,5 +166,8 @@ ssl_context.load_cert_chain(certfile=SSL_CERTFILE, keyfile=SSL_KEYFILE)
 # =============================
 print(f"[WebSocket] Running on ws://{HOST}:{PORT}")
 start_server = websockets.serve(handle_connection, HOST, PORT)
-asyncio.get_event_loop().run_until_complete(start_server)
-asyncio.get_event_loop().run_forever()
+try:
+    asyncio.get_event_loop().run_until_complete(start_server)
+    asyncio.get_event_loop().run_forever()
+except KeyboardInterrupt:
+    print("\n[Server] Shutdown requested. Closing Down...")

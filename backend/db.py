@@ -1,52 +1,64 @@
-import sqlite3
-import bcrypt
+import mysql.connector  # MySQL client library
+import bcrypt           # For secure password hashing
+import os
+from dotenv import load_dotenv
 
-# Initialize the database
-def init_db():
-    conn = sqlite3.connect('securechat.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL
-        )
-    ''')
-    conn.commit()
-    conn.close()
+# Load environment variables from .env file
+load_dotenv()
 
-# Hash a password
-def hash_password(password):
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+# MySQL connection settings loaded from environment
+MYSQL_CONFIG = {
+    'host': os.getenv("MYSQL_HOST"),
+    'port': int(os.getenv("MYSQL_PORT")),
+    'user': os.getenv("MYSQL_USER"),
+    'password': os.getenv("MYSQL_PASSWORD"),
+    'database': os.getenv("MYSQL_DB")
+}
 
+# ============================
 # Authenticate a user
+# ============================
 def authenticate_user(username, password):
-    conn = sqlite3.connect('securechat.db')
-    cursor = conn.cursor()
-    cursor.execute('SELECT password FROM users WHERE username = ?', (username,))
-    row = cursor.fetchone()
-    conn.close()
-    if row and bcrypt.checkpw(password.encode('utf-8'), row[0]):
-        return True
-    return False
+    """
+    Verifies a user's credentials by checking the MySQL users table.
 
-# Add a user (for testing)
-def add_user(username, password):
-    conn = sqlite3.connect('securechat.db')
-    cursor = conn.cursor()
-    # Check if the user already exists
-    cursor.execute('SELECT username FROM users WHERE username = ?', (username,))
-    if cursor.fetchone() is None:
-        # User does not exist, so add them
-        cursor.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, hash_password(password)))
-        conn.commit()
-        print(f"Added user: {username}")
-    else:
-        print(f"User '{username}' already exists in the database.")
-    conn.close()
+    Args:
+        username (str): The username provided by the client.
+        password (str): The plaintext password provided by the client.
 
-# Initialize the database and add a test user
-init_db()
-add_user('user1', 'password123')  # This will now check if the user exists before adding
-add_user('user2', 'password456')  # New user
-add_user('user3', 'password789')  # Another new user
+    Returns:
+        bool: True if authentication succeeds, False otherwise.
+    """
+    try:
+        # Connect to MySQL database using credentials from .env
+        conn = mysql.connector.connect(**MYSQL_CONFIG)
+        cursor = conn.cursor()
+
+        # Query the hashed password for the given username
+        cursor.execute("SELECT password FROM users WHERE username = %s", (username,))
+        row = cursor.fetchone()
+        conn.close()
+
+        # Validate the provided password against the hashed one
+        if row and bcrypt.checkpw(password.encode('utf-8'), row[0].encode('utf-8')):
+            return True
+        return False
+
+    except mysql.connector.Error as err:
+        print(f"[MySQL ERROR - AUTH] {err}")
+        return False
+
+# ============================
+# Hash a password securely
+# ============================
+def hash_password(password):
+    """
+    Hashes a plaintext password using bcrypt.
+
+    Args:
+        password (str): The plaintext password to hash.
+
+    Returns:
+        str: A bcrypt-hashed password (UTF-8 decoded).
+    """
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')

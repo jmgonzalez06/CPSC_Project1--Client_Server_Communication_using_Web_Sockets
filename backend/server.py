@@ -62,11 +62,25 @@ async def handle_connection(websocket, path):
     connected_clients.add(websocket)
     print(f"[WebSocket] New client connected. Total: {len(connected_clients)}")
 
-    # Parse the username from the WebSocket URL query string
+        # Parse the username from the WebSocket URL query string
     parsed = urlparse(path)
     query = parse_qs(parsed.query)
     username = query.get("user", [None])[0]
 
+    # Validate that the user exists in the MySQL database
+    # This protects against someone guessing ?user=admin in the WebSocket URL
+    try:
+        conn = mysql.connector.connect(**MYSQL_CONFIG)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM users WHERE username = %s", (username,))
+        if cursor.fetchone() is None:
+            print(f"[WebSocket] Unauthorized username: {username}")
+            await websocket.close()
+            return
+    finally:
+        if 'conn' in locals() and conn.is_connected():
+            cursor.close()
+            conn.close()
     if not username:
         print("[WebSocket] Connection rejected: no username provided.")
         await websocket.close()

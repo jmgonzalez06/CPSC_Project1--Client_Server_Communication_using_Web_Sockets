@@ -1,11 +1,14 @@
-// Our Websocket DOM element 
-// Dynamically retrieves IP address
-const host = window.location.hostname;
-console.log('host is trying to connect to: ', host);
-const wsUrl = `ws://${host}:8080`; //Update to wss when possible
-const ws = new WebSocket(wsUrl);
+// =============================
+// SecureChat Frontend Script
+// =============================
 
-// Select DOM elements that we need for index.html
+const host = window.location.hostname;
+console.log('Connecting to host:', host);
+
+let ws = null;
+let currentUser = null;
+
+// DOM element references
 const loginPage = document.getElementById('login-page');
 const chatScreen = document.getElementById('chat-screen');
 const usernameInput = document.getElementById('username');
@@ -24,9 +27,16 @@ const underlineButton = document.getElementById('underline-button');
 const fileButton = document.getElementById('file-button');
 const fileInput = document.getElementById('file-input');
 
-let currentUser = null;
+// Typing status display
+const typingStatus = document.createElement('div');
+typingStatus.id = 'typing-status';
+typingStatus.style.color = 'gray';
+typingStatus.style.fontStyle = 'italic';
+chatScreen.insertBefore(typingStatus, chatScreen.children[1]);
 
-// Login functionality with server-side authentication
+// =============================
+// Login Handler
+// =============================
 loginButton.addEventListener('click', async () => {
     const username = usernameInput.value.trim();
     const password = passwordInput.value.trim();
@@ -42,6 +52,7 @@ loginButton.addEventListener('click', async () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password })
         });
+
         const result = await response.json();
 
         if (result.success) {
@@ -52,180 +63,91 @@ loginButton.addEventListener('click', async () => {
             sendButton.disabled = false;
             setTimeout(scrollToBottom, 0);
             alert(`Welcome, ${currentUser}!`);
+            initializeWebSocket();
         } else {
             alert(result.message || 'Invalid username or password.');
         }
     } catch (error) {
         console.error('Login error:', error);
-        alert('An error occurred during login. Please try again.');
+        alert('An error occurred during login.');
     }
 });
 
-// Sends a message as a JSON object to the server
-// This is the main chat message payload used by both raw input and Enter key
+// =============================
+// WebSocket Setup (Post-login)
+// =============================
+function initializeWebSocket() {
+    ws = new WebSocket(`ws://${host}:8080?user=${encodeURIComponent(currentUser)}`);
+
+    ws.onopen = () => {
+        console.log('Connected to WebSocket');
+        setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send('heartbeat');
+            }
+        }, 10000); // Heartbeat every 10s
+    };
+
+    ws.onmessage = (event) => {
+        if (event.data.startsWith('heartbeat')) return;
+
+        try {
+            const data = JSON.parse(event.data);
+
+            if (data.type === "message") {
+                const message = data.user === currentUser
+                    ? `<span style="color: orange;">You</span>: ${parseMarkdown(data.message)}`
+                    : `<span style="color: blue;">${data.user}</span>: ${parseMarkdown(data.message)}`;
+                addMessageToChat(message);
+            }
+
+            if (data.type === "typing") {
+                typingStatus.textContent = `${data.user} is typing...`;
+                setTimeout(() => { typingStatus.textContent = ''; }, 3000);
+            }
+
+            if (data.type === "status") {
+                const statusText = `${data.user} is ${data.status}`;
+                addMessageToChat(`<i style="color: gray;">${statusText}</i>`);
+            }
+        } catch (e) {
+            console.error("Invalid message from server:", event.data);
+        }
+    };
+
+    ws.onclose = () => console.log('WebSocket disconnected.');
+    ws.onerror = (e) => console.error('WebSocket error:', e);
+}
+
+// =============================
+// Sending Messages
+// =============================
 function sendMessage() {
     const message = messageInput.value.trim();
-    if (!message) return;
+    if (!message || !ws) return;
 
-    // Send message with WebSocket send
     ws.send(JSON.stringify({
         type: "message",
         user: currentUser,
         message: message
-    }));    
+    }));
     messageInput.value = '';
-
-    // Add user's message to chat history
-    addMessageToChat(`${currentUser}: ${message}`);
+    addMessageToChat(`<span style="color: orange;">You</span>: ${parseMarkdown(message)}`);
 }
 
-// Add a message to the chat history
-function addMessageToChat(message) {
-    const messageElement = document.createElement('div');
-    messageElement.innerHTML = parseMarkdown(message); // Parse Markdown after sending
-    chatHistory.appendChild(messageElement); //line 26 in index
-
-    // Scroll to the bottom after adding a new message
-    scrollToBottom();
-}
-
-// Function to scroll chat history to the bottom, since it was being added to the top at first
-function scrollToBottom() {
-    // Ensure the chat history scrolls to the bottom. I still need to figure out how to get it to start near the text box
-    chatHistory.scrollTop = chatHistory.scrollHeight;
-}
-
-// Event listener for the Enter key in the message input as this would make it easier to test over only click listener on send button
 messageInput.addEventListener('keypress', (event) => {
-    if (event.key === 'Enter') {
-        sendMessage();
-    } else {
-        // Notify others that this user is typing
-        ws.send(JSON.stringify({
-            type: "typing",
-            user: currentUser
-        }));
+    if (event.key === 'Enter') sendMessage();
+    else if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "typing", user: currentUser }));
     }
 });
-
-// Logout functionality
-logoutButton.addEventListener('click', () => {
-    currentUser = null;
-    chatHistory.innerHTML = ''; // Clear chat history for only the user who logged out
-    messageInput.value = '';
-    messageInput.disabled = true;
-    sendButton.disabled = true;
-    chatScreen.style.display = 'none';
-    loginPage.style.display = 'block';  //to insure login-page is visuable by default
-});
-
-
-
-// Text formatting functionality
-
-// Event listeners for buttons
-boldButton.addEventListener('click', () => {
-    formatText('bold');
-});
-
-italicsButton.addEventListener('click', () => {
-    formatText('italic');
-});
-
-underlineButton.addEventListener('click', () => {
-    formatText('underline');
-});
-
-// Logic to apply text formatting
-function formatText(style) {
-    const currentValue = messageInput.value;
-    let formattedText = '';
-
-    // Check if the text is already formatted
-    if (currentValue.startsWith(`**${style}**`) || currentValue.startsWith(`*${style}*`) || currentValue.startsWith(`_${style}_`)) {
-        // Remove the formatting
-        formattedText = currentValue.replace(`**${style}**`, '').replace(`*${style}*`, '').replace(`_${style}_`, '');
-    } else {
-        // Add the formatting
-        switch (style) {
-            case 'bold':
-                formattedText = `**${currentValue}**`;
-                break;
-            case 'italic':
-                formattedText = `*${currentValue}*`;
-                break;
-            case 'underline':
-                formattedText = `_${currentValue}_`;
-                break;
-            default:
-                formattedText = currentValue;
-        }
-    }
-
-    // Update the input field
-    messageInput.value = formattedText;
-}
-
-// Function to apply Mardkown Syntax
-function parseMarkdown(text) {
-    return text
-        .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>') // links
-        .replace(/(\*\*(.*?)\*\*)/g, '<b>$2</b>')
-        .replace(/(\*(.*?)\*)/g, '<i>$2</i>')
-        .replace(/(_(.*?)_)/g, '<u>$2</u>');
-}
-
-// Emoji functionality
-const emojiList = document.getElementById('emoji-list');
-
-const emojis = ['🙂', '😀', '😄', '😎', '😍',
-    '🙁', '😮', '😲', '😳', '😦',
-    '😥', '😢', '😭', '😱', '😓',
-    '🥰', '😋', '🤪', '😛', '😜',
-    '😂', '🤭', '🤫', '🤨', '😐',
-    '😒', '🙄', '😬', '🤢', '🤮',
-    '🥶', '🥴', '💀', '🤡', '💩',];
-    
-emojis.forEach((emoji) => {
-    const emojiElement = document.createElement('span');
-    emojiElement.textContent = emoji;
-    emojiElement.className = 'emoji';
-    emojiList.appendChild(emojiElement);
-});
-
-emojiButton.addEventListener('click', () => {
-    console.log('Emoji button clicked, current display:', emojiMenu.style.display);
-    emojiMenu.style.display = emojiMenu.style.display === 'block' ? 'none' : 'block';
-    console.log('New display:', emojiMenu.style.display);
-});
-
-closeEmojiMenuButton.addEventListener('click', () => {
-    emojiMenu.style.display = 'none';
-});
-
-document.querySelectorAll('.emoji').forEach((emoji) => {
-    emoji.addEventListener('click', () => {
-        const cursorPosition = messageInput.selectionStart;
-        messageInput.value = messageInput.value.substring(0, cursorPosition) + emoji.textContent + messageInput.value.substring(cursorPosition);
-        messageInput.focus();
-        emojiMenu.style.display = 'none';
-    });
-});
-
 sendButton.addEventListener('click', sendMessage);
 
-messageInput.addEventListener('keypress', (event) => {
-    if (event.key === 'Enter') {
-        sendMessage();
-    }
-    if (event.key === 'Enter') {
-        const message = event.target.value;
-        ws.send(message);
-        event.target.value = '';
-    }
-});
-
+// =============================
+// Logout
+// =============================
 logoutButton.addEventListener('click', () => {
+    if (ws) ws.close();
     currentUser = null;
     chatHistory.innerHTML = '';
     messageInput.value = '';
@@ -235,50 +157,86 @@ logoutButton.addEventListener('click', () => {
     loginPage.style.display = 'block';
 });
 
-ws.onerror = (error) => {
-    console.error('WebSocket error:', error);
+// =============================
+// Markdown Parser
+// =============================
+function parseMarkdown(text) {
+    return text
+        .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>') // Markdown link [text](url)
+        .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>') // Bold
+        .replace(/\*(.*?)\*/g, '<i>$1</i>')     // Italic
+        .replace(/_(.*?)_/g, '<u>$1</u>');      // Underline
+}
+
+// =============================
+// Chat Display Helpers
+// =============================
+function addMessageToChat(html) {
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    chatHistory.appendChild(div);
+    scrollToBottom();
+}
+function scrollToBottom() {
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+
+// =============================
+// Text Formatting Buttons
+// =============================
+boldButton.onclick = () => formatText('**');
+italicsButton.onclick = () => formatText('*');
+underlineButton.onclick = () => formatText('_');
+
+function formatText(symbol) {
+    const msg = messageInput.value;
+    messageInput.value = `${symbol}${msg}${symbol}`;
+}
+
+// =============================
+// Emoji Functionality
+// =============================
+
+// 1. Add emojis dynamically to #emoji-list
+const emojiList = document.getElementById('emoji-list');
+const emojis = ['🙂', '😀', '😄', '😎', '😍',
+    '🙁', '😮', '😲', '😳', '😦',
+    '😥', '😢', '😭', '😱', '😓',
+    '🥰', '😋', '🤪', '😛', '😜',
+    '😂', '🤭', '🤫', '🤨', '😐',
+    '😒', '🙄', '😬', '🤢', '🤮',
+    '🥶', '🥴', '💀', '🤡', '💩'];
+
+emojis.forEach((emoji) => {
+    const emojiElement = document.createElement('span');
+    emojiElement.textContent = emoji;
+    emojiElement.className = 'emoji';
+    emojiList.appendChild(emojiElement);
+});
+
+// 2. Toggle emoji menu visibility
+emojiButton.onclick = () => {
+    emojiMenu.style.display = emojiMenu.style.display === 'block' ? 'none' : 'block';
+};
+closeEmojiMenuButton.onclick = () => {
+    emojiMenu.style.display = 'none';
 };
 
-ws.onopen = () => {
-    console.log('Connected to the WebSocket server');
-    console.log(wsUrl)
-    // Heartbeat loop
-    setInterval(() => {
-        ws.send('heartbeat');
-    }, 10000); // 10 sec interval
-};
+// 3. Insert clicked emoji into message input
+document.querySelectorAll('.emoji').forEach(e => {
+    e.onclick = () => {
+        const pos = messageInput.selectionStart;
+        messageInput.value = messageInput.value.substring(0, pos) + e.textContent + messageInput.value.substring(pos);
+        messageInput.focus();
+        emojiMenu.style.display = 'none';
+    };
+});
 
-// Handle incoming WebSocket messages: status updates, typing, or chat
-ws.onmessage = (event) => {
-    if (event.data.startsWith('heartbeat')) return;
-
-    try {
-        const data = JSON.parse(event.data);
-
-        if (data.type === "message") {
-            const message = data.user === currentUser
-                ? `<span style="color: orange;">You</span>: ${parseMarkdown(data.message)}`
-                : `<span style="color: blue;">${data.user}</span>: ${parseMarkdown(data.message)}`;
-            addMessageToChat(message);
-        }
-
-        if (data.type === "typing") {
-            console.log(`${data.user} is typing...`);
-            // Later: Show a "typing..." label in the UI
-        }
-
-        if (data.type === "status") {
-            const statusText = `${data.user} is ${data.status}`;
-            addMessageToChat(`<i style="color: gray;">${statusText}</i>`);
-        }
-    } catch (e) {
-        console.error("Invalid JSON received:", event.data);
-    }
-};
-
-fileButton.addEventListener('click', () => fileInput.click());
-
-fileInput.addEventListener('change', async () => {
+// =============================
+// File Upload Handler
+// =============================
+fileButton.onclick = () => fileInput.click();
+fileInput.onchange = async () => {
     const file = fileInput.files[0];
     if (!file) return;
 
@@ -290,24 +248,18 @@ fileInput.addEventListener('change', async () => {
             method: 'POST',
             body: formData
         });
-
         const result = await res.json();
         if (result.success) {
-            const fileLink = result.url;
             ws.send(JSON.stringify({
                 type: "message",
                 user: currentUser,
-                message: `Shared a file: [${file.name}](${fileLink})`
-            }));                       
+                message: `Shared a file: [${file.name}](${result.url})`
+            }));
         } else {
-            alert('File upload failed');
+            alert('Upload failed.');
         }
     } catch (err) {
-        console.error('File upload error:', err);
-        alert('Error uploading file');
+        console.error('Upload error:', err);
+        alert('Upload failed.');
     }
-});
-
-ws.onclose = () => {
-    console.log('Disconnected from the WebSocket server');
 };

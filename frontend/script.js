@@ -26,13 +26,8 @@ const italicsButton = document.getElementById('italics-button');
 const underlineButton = document.getElementById('underline-button');
 const fileButton = document.getElementById('file-button');
 const fileInput = document.getElementById('file-input');
+const typingStatus = document.getElementById('typing-status');
 
-// Typing status display
-const typingStatus = document.createElement('div');
-typingStatus.id = 'typing-status';
-typingStatus.style.color = 'gray';
-typingStatus.style.fontStyle = 'italic';
-chatScreen.insertBefore(typingStatus, chatScreen.children[1]);
 
 // =============================
 // Login Handler
@@ -77,39 +72,51 @@ loginButton.addEventListener('click', async () => {
 // WebSocket Setup (Post-login)
 // =============================
 function initializeWebSocket() {
-    ws = new WebSocket(`ws://${host}:8080?user=${encodeURIComponent(currentUser)}`);
+    console.log("🔥 initializeWebSocket() called");
+    // ws = new WebSocket(`ws://${host}:8080?user=${encodeURIComponent(currentUser)}`)
+    const wsUrl = `ws://${window.location.hostname}:8080?user=${encodeURIComponent(currentUser)}`;
+    console.log("🔌 Connecting to:", wsUrl);
+    ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
         console.log('Connected to WebSocket');
         setInterval(() => {
             if (ws.readyState === WebSocket.OPEN) {
-                ws.send('heartbeat');
+                ws.send(JSON.stringify({ type: "heartbeat" }));
             }
         }, 10000); // Heartbeat every 10s
     };
 
     ws.onmessage = (event) => {
-        if (event.data.startsWith('heartbeat')) return;
-
         try {
             const data = JSON.parse(event.data);
-
+    
+            // Ignore heartbeat messages
+            if (data.type === "heartbeat") return;
+    
             if (data.type === "message") {
+                const isLink = data.message.includes("Shared a file:");
                 const message = data.user === currentUser
-                    ? `<span style="color: orange;">You</span>: ${parseMarkdown(data.message)}`
-                    : `<span style="color: blue;">${data.user}</span>: ${parseMarkdown(data.message)}`;
+                    ? `<span style="color: orange;">You</span>: ${isLink ? data.message : parseMarkdown(data.message)}`
+                    : `<span style="color: blue;">${data.user}</span>: ${isLink ? data.message : parseMarkdown(data.message)}`;
                 addMessageToChat(message);
             }
-
+    
             if (data.type === "typing") {
                 typingStatus.textContent = `${data.user} is typing...`;
                 setTimeout(() => { typingStatus.textContent = ''; }, 3000);
+                return; // skip the fallback log
             }
-
+    
             if (data.type === "status") {
                 const statusText = `${data.user} is ${data.status}`;
                 addMessageToChat(`<i style="color: gray;">${statusText}</i>`);
             }
+
+            if (data.type === "status" && data.status === "cleared the chat history") {
+                chatHistory.innerHTML = ''; // Added to attempt to clear the DOM
+            }
+    
         } catch (e) {
             console.error("Invalid message from server:", event.data);
         }
@@ -125,14 +132,19 @@ function initializeWebSocket() {
 function sendMessage() {
     const message = messageInput.value.trim();
     if (!message || !ws) return;
-
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        console.warn("WebSocket is not open.");
+        return;
+    }
+    
     ws.send(JSON.stringify({
         type: "message",
         user: currentUser,
         message: message
     }));
     messageInput.value = '';
-    addMessageToChat(`<span style="color: orange;">You</span>: ${parseMarkdown(message)}`);
+    const isLink = message.includes("Shared a file:");
+    addMessageToChat(`<span style="color: orange;">You</span>: ${isLink ? message : parseMarkdown(message)}`);
 }
 
 messageInput.addEventListener('keypress', (event) => {
@@ -253,7 +265,7 @@ fileInput.onchange = async () => {
             ws.send(JSON.stringify({
                 type: "message",
                 user: currentUser,
-                message: `Shared a file: [${file.name}](${result.url})`
+                message: `Shared a file: <a href="${result.url}" target="_blank">${file.name}</a>`
             }));
         } else {
             alert('Upload failed.');

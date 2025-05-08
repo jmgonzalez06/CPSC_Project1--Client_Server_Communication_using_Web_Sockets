@@ -83,6 +83,15 @@ button:hover {
     color: #FF7900;
 }
 
+/* Typing Status */
+#typing-status {
+    min-height: 1.5em;
+    color: gray;
+    font-style: italic;
+    padding-left: 10px;
+    transition: opacity 0.2s ease;
+  }
+
 /* Chat History */
 #chat-history {
     height: 300px;

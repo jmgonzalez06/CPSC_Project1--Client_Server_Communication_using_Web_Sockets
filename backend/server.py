@@ -17,12 +17,13 @@ from flask_cors import CORS
 from flask import send_from_directory
 from db import authenticate_user, hash_password
 from urllib.parse import urlparse, parse_qs # This will let us extract the user query parameter from the WebSocket URL
+from werkzeug.utils import secure_filename # This imports a function from the Werkzeug library (used internally by Flask) that sanitizes file names for safe usage on the filesystem and in URLs. 
 
 # =============================
 # Server Configuration
 # =============================
 load_dotenv()
-HOST = socket.gethostbyname(socket.gethostname())
+HOST = HOST = "0.0.0.0" # Possible temp fix, maybe full fix
 PORT = int(os.getenv("PORT", 8080))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SSL_CERTFILE = os.path.join(BASE_DIR, "cert.pem")
@@ -61,12 +62,27 @@ threading.Thread(target=httpd.serve_forever, daemon=True).start()
 async def handle_connection(websocket, path):
     connected_clients.add(websocket)
     print(f"[WebSocket] New client connected. Total: {len(connected_clients)}")
+    print(f"[WebSocket] Incoming connection path: {path}")
 
-    # Parse the username from the WebSocket URL query string
+        # Parse the username from the WebSocket URL query string
     parsed = urlparse(path)
     query = parse_qs(parsed.query)
     username = query.get("user", [None])[0]
 
+    # Validate that the user exists in the MySQL database
+    # This protects against someone guessing ?user=admin in the WebSocket URL
+    try:
+        conn = mysql.connector.connect(**MYSQL_CONFIG)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM users WHERE username = %s", (username,))
+        if cursor.fetchone() is None:
+            print(f"[WebSocket] Unauthorized username: {username}")
+            await websocket.close()
+            return
+    finally:
+        if 'conn' in locals() and conn.is_connected():
+            cursor.close()
+            conn.close()
     if not username:
         print("[WebSocket] Connection rejected: no username provided.")
         await websocket.close()
@@ -100,6 +116,9 @@ async def handle_connection(websocket, path):
                 # Attempt to parse incoming message as JSON
                 data = json.loads(raw_message)
                 msg_type = data.get("type")
+                
+                if msg_type == "heartbeat":
+                    continue  # Ignore heartbeats (no broadcast, no fallback)
 
                 if msg_type == "typing":
                     typing_notice = json.dumps({
@@ -112,7 +131,28 @@ async def handle_connection(websocket, path):
 
                 elif msg_type == "message":
                     message_content = data.get("message", "")
+                    client_id = id(websocket)
+                    now = time.time()
+                    last_time, count = client_msg_freq.get(client_id, (now, 0))
+
+                    if now - last_time < RATE_LIMIT_INTERVAL:
+                        count += 1
+                    else:
+                        count = 1
+                        last_time = now
+
+                    client_msg_freq[client_id] = (last_time, count)
+
+                    if count > RATE_LIMIT_THRESHOLD:
+                        warning_msg = json.dumps({
+                            "type": "status",
+                            "user": sender,
+                            "status": "sending messages too fast. Slow down!"
+                        })
+                        await websocket.send(warning_msg)
+                        continue
                     print(f"[Message] {message_content}")
+                    
                     # Handle command to clear chat history
                     if message_content.strip() == "/clear-h":
                         chat_history.clear()
@@ -124,7 +164,7 @@ async def handle_connection(websocket, path):
                         for client in connected_clients:
                             if client.open:
                                 await client.send(clear_notice)
-                        return  # Exit early so nothing else is sent
+                        continue  
 
                     formatted_message = json.dumps({
                         "type": "message",
@@ -249,9 +289,13 @@ def upload_file():
     if not file:
         return jsonify({'success': False, 'message': 'No file received'}), 400
 
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
+    # Sanitize the filename and save it
+    filename = secure_filename(file.filename)
+    file_path = os.path.join(UPLOAD_DIR, filename)
     file.save(file_path)
-    file_url = f"http://{HOST}:5000/uploads/{file.filename}"
+
+    # Use 127.0.0.1 for routable download
+    file_url = f"http://127.0.0.1:5000/uploads/{filename}"
     return jsonify({'success': True, 'url': file_url}), 200
 
 @app.route('/uploads/<filename>')
@@ -273,7 +317,8 @@ ssl_context.load_cert_chain(certfile=SSL_CERTFILE, keyfile=SSL_KEYFILE)
 # =============================
 # Launch WebSocket Server
 # =============================
-print(f"[WebSocket] Running on ws://{HOST}:{PORT}")
+# print(f"[WebSocket] Running on ws://{HOST}:{PORT}") attempt fix 
+print("[WebSocket] Running on all interfaces (0.0.0.0)")
 start_server = websockets.serve(handle_connection, HOST, PORT)
 try:
     asyncio.get_event_loop().run_until_complete(start_server)

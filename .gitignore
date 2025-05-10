@@ -8,3 +8,14 @@ cert.pem
 # Start MySQL Locally with: sudo service mysql start
 # User 2 Password Hashed: $2b$12$HmTLcpP6Lko1k4SGNA.2eeMOUwESuzosPw5q8OAiBeoCC6kKjy87C
 # User 3 Password Hashed: $2b$12$IOqNcjYa6.Dvdxw4P1IlTOMlnmVCgAswFjYDJoeKoLNZi/Tn7HJjy
+# 1. Implement MySQL-based message history per room
+# 2. Improve room-specific chat clearing logic
+# 3. Polish the UI/UX styling
+# 4. Connected User List
+# 5. Show live user panel with online/typing status
+# 6. Encryption Enhancements 
+# -Use End-to-End Encryption on all messages and files before they leave the client. 
+# -Store only encrypted blobs on the server. The server must not be able to decrypt messages.
+# 7. Deployment-Ready Improvements
+# 8. Use wss:// for secure WebSocket communication
+# 9. Deploy to InfinityFree and or Render and or Railway and or Firebase/Backblaze B2 and or Glitch and or Cloudflare and or fly.io and or Vercel (open to suggestions and plan)

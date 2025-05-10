@@ -182,6 +182,20 @@ async def handle_connection(websocket, path):
                         "room": msg_room,
                         "message": message_content
                     })
+                    try:
+                        conn = mysql.connector.connect(**MYSQL_CONFIG)
+                        cursor = conn.cursor()
+                        cursor.execute(
+                            "INSERT INTO messages (room, username, message) VALUES (%s, %s, %s)",
+                            (msg_room, sender, message_content)
+                        )
+                        conn.commit()
+                    except mysql.connector.Error as err:
+                        print(f"[MySQL ERROR - INSERT] {err}")
+                    finally:
+                        if 'conn' in locals() and conn.is_connected():
+                            cursor.close()
+                            conn.close()
                     for client in connected_clients:
                         if client != websocket and client.open and rooms.get(client) == msg_room:
                             await client.send(formatted_message)

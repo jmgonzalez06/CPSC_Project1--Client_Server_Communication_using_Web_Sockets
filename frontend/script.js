@@ -287,6 +287,18 @@ fileInput.onchange = async () => {
 // =============================
 function populateRoomList() {
     const roomList = document.getElementById('room-list');
+    roomList.innerHTML = '';
+    const mainRoom = document.createElement('div');
+    mainRoom.className = 'room';
+    mainRoom.textContent = 'Main Chat';
+    mainRoom.dataset.room = 'main';
+    mainRoom.onclick = () => {
+        document.querySelectorAll('.room').forEach(r => r.classList.remove('selected'));
+        mainRoom.classList.add('selected');
+        currentRoom = 'main';
+        chatHistory.innerHTML = '';
+    };
+    roomList.appendChild(mainRoom);
 
     // Dummy users for now — in real code, replace with live online users
     const users = ['user1', 'user2', 'user3'].filter(u => u !== currentUser);

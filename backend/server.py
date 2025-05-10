@@ -40,6 +40,7 @@ MYSQL_CONFIG = {
 
 connected_clients = set()
 usernames = {} # Track usernames in a global dict
+rooms = {}  # Track which room each websocket is in
 client_msg_freq = {}
 chat_history = []  # Store recent chat messages in memory
 RATE_LIMIT_INTERVAL = 5
@@ -89,6 +90,7 @@ async def handle_connection(websocket, path):
         return
 
     usernames[websocket] = username
+    rooms[websocket] = "main"  # default room assignment
     print(f"[WebSocket] User '{username}' connected. Total: {len(connected_clients)+1}")
     # Send chat history to the newly connected user
     for past_message in chat_history:
@@ -165,20 +167,23 @@ async def handle_connection(websocket, path):
                             if client.open:
                                 await client.send(clear_notice)
                         continue  
-
+                    msg_room = data.get("room", "main")
+                    rooms[websocket] = msg_room
                     formatted_message = json.dumps({
                         "type": "message",
                         "user": sender,
+                        "room": msg_room,
                         "message": message_content
                     })
                     # Save message to chat history
                     chat_history.append({
                         "type": "message",
                         "user": sender,
+                        "room": msg_room,
                         "message": message_content
                     })
                     for client in connected_clients:
-                        if client != websocket and client.open:
+                        if client != websocket and client.open and rooms.get(client) == msg_room:
                             await client.send(formatted_message)
 
             except json.JSONDecodeError:
@@ -198,6 +203,7 @@ async def handle_connection(websocket, path):
     except websockets.ConnectionClosed:
         disconnecting_user = usernames.pop(websocket, "unknown")
         connected_clients.discard(websocket)
+        rooms.pop(websocket, None)
 
         status_message = json.dumps({
             "type": "status",
@@ -219,6 +225,7 @@ async def heartbeat(websocket, client_id):
         except websockets.ConnectionClosed:
             client_msg_freq.pop(client_id, None)
             connected_clients.discard(websocket)
+            rooms.pop(websocket, None)
             print(f"[WebSocket] Client disconnected. Total clients: {len(connected_clients)}")
             break
 

@@ -7,6 +7,8 @@ console.log('Connecting to host:', host);
 
 let ws = null;
 let currentUser = null;
+let currentRoom = "main"; // default room
+
 
 // DOM element references
 const loginPage = document.getElementById('login-page');
@@ -59,6 +61,7 @@ loginButton.addEventListener('click', async () => {
             setTimeout(scrollToBottom, 0);
             alert(`Welcome, ${currentUser}!`);
             initializeWebSocket();
+            populateRoomList();
         } else {
             alert(result.message || 'Invalid username or password.');
         }
@@ -95,6 +98,7 @@ function initializeWebSocket() {
             if (data.type === "heartbeat") return;
     
             if (data.type === "message") {
+                if (data.room && data.room !== currentRoom) return;
                 const isLink = data.message.includes("Shared a file:");
                 const message = data.user === currentUser
                     ? `<span style="color: orange;">You</span>: ${isLink ? data.message : parseMarkdown(data.message)}`
@@ -140,6 +144,7 @@ function sendMessage() {
     ws.send(JSON.stringify({
         type: "message",
         user: currentUser,
+        room: currentRoom,
         message: message
     }));
     messageInput.value = '';
@@ -265,6 +270,7 @@ fileInput.onchange = async () => {
             ws.send(JSON.stringify({
                 type: "message",
                 user: currentUser,
+                 room: currentRoom,
                 message: `Shared a file: <a href="${result.url}" target="_blank">${file.name}</a>`
             }));
         } else {
@@ -275,3 +281,30 @@ fileInput.onchange = async () => {
         alert('Upload failed.');
     }
 };
+
+// =============================
+// Used to Pupulate a list of available chat rooms based on users
+// =============================
+function populateRoomList() {
+    const roomList = document.getElementById('room-list');
+
+    // Dummy users for now — in real code, replace with live online users
+    const users = ['user1', 'user2', 'user3'].filter(u => u !== currentUser);
+
+    users.forEach(user => {
+        const roomName = currentUser < user ? `${currentUser}-${user}` : `${user}-${currentUser}`;
+        const roomDiv = document.createElement('div');
+        roomDiv.className = 'room';
+        roomDiv.textContent = `Chat with ${user}`;
+        roomDiv.dataset.room = roomName;
+
+        roomDiv.onclick = () => {
+            document.querySelectorAll('.room').forEach(r => r.classList.remove('selected'));
+            roomDiv.classList.add('selected');
+            currentRoom = roomName;
+            chatHistory.innerHTML = ''; // Clear UI for the selected room
+        };
+
+        roomList.appendChild(roomDiv);
+    });
+}

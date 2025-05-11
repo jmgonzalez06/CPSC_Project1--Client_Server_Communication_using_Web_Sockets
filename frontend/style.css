@@ -225,3 +225,15 @@ button:hover {
     background-color: #bbb;
     font-weight: bold;
 }
+
+#user-list {
+    margin-top: 10px;
+}
+
+.user-online {
+    font-size: 14px;
+    padding: 5px 10px;
+    border-bottom: 1px solid #ccc;
+    color: green;
+    transition: all 0.2s ease-in-out;
+}

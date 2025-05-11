@@ -90,6 +90,23 @@ async def handle_connection(websocket, path):
         return
 
     usernames[websocket] = username
+    # Broadcast to others that new user is online
+    status_broadcast = json.dumps({
+        "type": "status",
+        "user": username,
+        "status": "online"
+    })
+    for client in connected_clients:
+        if client != websocket and client.open:
+            await client.send(status_broadcast)
+    # Notify user about everyone else already online
+    for user_ws, user_name in usernames.items():
+        if user_ws != websocket:
+            await websocket.send(json.dumps({
+                "type": "status",
+                "user": user_name,
+                "status": "online"
+            }))
     rooms[websocket] = "main"  # default room assignment
     print(f"[WebSocket] User '{username}' connected. Total: {len(connected_clients)+1}")
     

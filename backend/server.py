@@ -116,17 +116,6 @@ async def handle_connection(websocket, path):
         if 'conn' in locals() and conn.is_connected():
             cursor.close()
             conn.close()
-
-    # Broadcast online presence
-    status_message = json.dumps({
-        "type": "status",
-        "user": username,
-        "status": "online"
-    })
-    for client in connected_clients:
-        if client != websocket and client.open:
-            await client.send(status_message)
-
     client_id = id(websocket)
     client_msg_freq[client_id] = (time.time(), 0)
     asyncio.create_task(heartbeat(websocket, client_id))
@@ -151,7 +140,7 @@ async def handle_connection(websocket, path):
                     for client in connected_clients:
                         if client != websocket and client.open:
                             await client.send(typing_notice)
-                
+
                 elif msg_type == "message":
                     message_content = data.get("message", "")
                     client_id = id(websocket)
@@ -274,6 +263,15 @@ async def handle_connection(websocket, path):
 
     except websockets.ConnectionClosed:
         disconnecting_user = usernames.pop(websocket, "unknown")
+        # Broadcast online presence
+        status_message = json.dumps({
+            "type": "status",
+            "user": username,
+            "status": "online"
+        })
+        for client in connected_clients:
+            if client != websocket and client.open:
+                await client.send(status_message)
         connected_clients.discard(websocket)
         rooms.pop(websocket, None)
 

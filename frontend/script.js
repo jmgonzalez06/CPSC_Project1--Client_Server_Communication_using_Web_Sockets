@@ -29,6 +29,7 @@ const underlineButton = document.getElementById('underline-button');
 const fileButton = document.getElementById('file-button');
 const fileInput = document.getElementById('file-input');
 const typingStatus = document.getElementById('typing-status');
+const onlineUsers = new Set();
 
 
 // =============================
@@ -86,8 +87,12 @@ function initializeWebSocket() {
         console.log('Connected to WebSocket');
         const waitForSocketOpen = setInterval(() => {
             if (ws.readyState === WebSocket.OPEN) {
-                const mainRoom = document.querySelector('[data-room="main"]');
-                if (mainRoom) mainRoom.click();
+                setTimeout(() => {
+                    const mainRoom = document.querySelector('[data-room="main"]');
+                    if (mainRoom && ws.readyState === WebSocket.OPEN) {
+                        mainRoom.click();
+                    }
+                }, 50);
                 clearInterval(waitForSocketOpen);
             }
         }, 50);
@@ -120,16 +125,29 @@ function initializeWebSocket() {
             }
     
             if (data.type === "typing") {
+                const userElement = [...document.querySelectorAll('.user-online')]
+                    .find(el => el.textContent === data.user);
+
+                if (userElement) {
+                    userElement.textContent = `${data.user} (typing...)`;
+                    setTimeout(() => {
+                        userElement.textContent = data.user;
+                    }, 3000);
+                }
                 typingStatus.textContent = `${data.user} is typing...`;
                 setTimeout(() => { typingStatus.textContent = ''; }, 3000);
                 return; // skip the fallback log
             }
     
             if (data.type === "status") {
-                const statusText = `${data.user} is ${data.status}`;
-                addMessageToChat(`<i style="color: gray;">${statusText}</i>`);
-            }
+                if (data.status === "online") {
+                    onlineUsers.add(data.user);
+                } else if (data.status === "offline") {
+                    onlineUsers.delete(data.user);
+                }
 
+                updateUserList();
+            }
             if (data.type === "status" && data.status === "cleared the chat history") {
                 chatHistory.innerHTML = ''; // Added to attempt to clear the DOM
             }
@@ -341,5 +359,20 @@ function populateRoomList() {
         };
 
         roomList.appendChild(roomDiv);
+    });
+}
+
+// =============================
+// For User List
+// =============================
+function updateUserList() {
+    const userList = document.getElementById('user-list');
+    userList.innerHTML = '';
+
+    onlineUsers.forEach(user => {
+        const div = document.createElement('div');
+        div.className = 'user-online';
+        div.textContent = user;
+        userList.appendChild(div);
     });
 }

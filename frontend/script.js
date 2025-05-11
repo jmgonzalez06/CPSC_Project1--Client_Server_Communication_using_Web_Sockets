@@ -62,6 +62,7 @@ loginButton.addEventListener('click', async () => {
             alert(`Welcome, ${currentUser}!`);
             initializeWebSocket();
             populateRoomList();
+            document.querySelector('[data-room="main"]').click();
         } else {
             alert(result.message || 'Invalid username or password.');
         }
@@ -83,11 +84,18 @@ function initializeWebSocket() {
 
     ws.onopen = () => {
         console.log('Connected to WebSocket');
+        const waitForSocketOpen = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+                const mainRoom = document.querySelector('[data-room="main"]');
+                if (mainRoom) mainRoom.click();
+                clearInterval(waitForSocketOpen);
+            }
+        }, 50);
         setInterval(() => {
             if (ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: "heartbeat" }));
             }
-        }, 10000); // Heartbeat every 10s
+        }, 10000);
     };
 
     ws.onmessage = (event) => {
@@ -98,11 +106,16 @@ function initializeWebSocket() {
             if (data.type === "heartbeat") return;
     
             if (data.type === "message") {
-                if (data.room && data.room !== currentRoom) return;
+                if (data.room !== currentRoom) {
+                    // Optionally: queue them per room (future enhancement)
+                    return;
+                }
+
                 const isLink = data.message.includes("Shared a file:");
                 const message = data.user === currentUser
                     ? `<span style="color: orange;">You</span>: ${isLink ? data.message : parseMarkdown(data.message)}`
                     : `<span style="color: blue;">${data.user}</span>: ${isLink ? data.message : parseMarkdown(data.message)}`;
+
                 addMessageToChat(message);
             }
     
@@ -297,6 +310,11 @@ function populateRoomList() {
         mainRoom.classList.add('selected');
         currentRoom = 'main';
         chatHistory.innerHTML = '';
+        // Notify the backend to load message history for the new room
+        ws.send(JSON.stringify({
+            type: "switch-room",
+            room: currentRoom
+        }));
     };
     roomList.appendChild(mainRoom);
 
@@ -315,6 +333,11 @@ function populateRoomList() {
             roomDiv.classList.add('selected');
             currentRoom = roomName;
             chatHistory.innerHTML = ''; // Clear UI for the selected room
+            // Notify backend to load chat history for this DM room
+            ws.send(JSON.stringify({
+                type: "switch-room",
+                room: currentRoom
+            }));
         };
 
         roomList.appendChild(roomDiv);

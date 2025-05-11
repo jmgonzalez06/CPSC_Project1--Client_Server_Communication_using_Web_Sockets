@@ -8,7 +8,7 @@ import http.server
 import socketserver
 import threading
 import ssl
-import mysql.connector  # type: ignore # For MySQL
+import mysql.connector   # type: ignore
 import bcrypt
 
 from dotenv import load_dotenv
@@ -92,9 +92,30 @@ async def handle_connection(websocket, path):
     usernames[websocket] = username
     rooms[websocket] = "main"  # default room assignment
     print(f"[WebSocket] User '{username}' connected. Total: {len(connected_clients)+1}")
-    # Send chat history to the newly connected user
-    for past_message in chat_history:
-        await websocket.send(json.dumps(past_message))
+    
+    # Load recent message history from MySQL for the default room
+    room = rooms[websocket]
+    try:
+        conn = mysql.connector.connect(**MYSQL_CONFIG)
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT username, message, timestamp FROM messages WHERE room = %s ORDER BY timestamp ASC",
+            (room,)
+        )
+        rows = cursor.fetchall()
+        for row in rows:
+            await websocket.send(json.dumps({
+                "type": "message",
+                "user": row["username"],
+                "room": room,
+                "message": row["message"]
+            }))
+    except mysql.connector.Error as err:
+        print(f"[MySQL ERROR - LOAD HISTORY] {err}")
+    finally:
+        if 'conn' in locals() and conn.is_connected():
+            cursor.close()
+            conn.close()
 
     # Broadcast online presence
     status_message = json.dumps({
@@ -130,7 +151,7 @@ async def handle_connection(websocket, path):
                     for client in connected_clients:
                         if client != websocket and client.open:
                             await client.send(typing_notice)
-
+                
                 elif msg_type == "message":
                     message_content = data.get("message", "")
                     client_id = id(websocket)
@@ -157,7 +178,17 @@ async def handle_connection(websocket, path):
                     
                     # Handle command to clear chat history
                     if message_content.strip() == "/clear-h":
-                        chat_history.clear()
+                        try:
+                            conn = mysql.connector.connect(**MYSQL_CONFIG)
+                            cursor = conn.cursor()
+                            cursor.execute("DELETE FROM messages WHERE room = %s", (msg_room,))
+                            conn.commit()
+                        except mysql.connector.Error as err:
+                            print(f"[MySQL ERROR - DELETE] {err}")
+                        finally:
+                            if 'conn' in locals() and conn.is_connected():
+                                cursor.close()
+                                conn.close()
                         clear_notice = json.dumps({
                             "type": "status",
                             "user": sender,
@@ -199,6 +230,33 @@ async def handle_connection(websocket, path):
                     for client in connected_clients:
                         if client != websocket and client.open and rooms.get(client) == msg_room:
                             await client.send(formatted_message)
+                
+                # Adding new message type for switching rooms
+                elif msg_type == "switch-room":
+                    new_room = data.get("room", "main")
+                    rooms[websocket] = new_room
+
+                    try:
+                        conn = mysql.connector.connect(**MYSQL_CONFIG)
+                        cursor = conn.cursor(dictionary=True)
+                        cursor.execute(
+                            "SELECT username, message, timestamp FROM messages WHERE room = %s ORDER BY timestamp ASC",
+                            (new_room,)
+                        )
+                        rows = cursor.fetchall()
+                        for row in rows:
+                            await websocket.send(json.dumps({
+                                "type": "message",
+                                "user": row["username"],
+                                "room": new_room,
+                                "message": row["message"]
+                            }))
+                    except mysql.connector.Error as err:
+                        print(f"[MySQL ERROR - SWITCH ROOM LOAD] {err}")
+                    finally:
+                        if 'conn' in locals() and conn.is_connected():
+                            cursor.close()
+                            conn.close()
 
             except json.JSONDecodeError:
                 # Handle raw string fallback

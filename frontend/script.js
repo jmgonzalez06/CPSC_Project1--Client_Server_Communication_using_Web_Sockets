@@ -56,12 +56,15 @@ loginButton.addEventListener('click', async () => {
         if (result.success) {
             currentUser = username;
             loginPage.style.display = 'none';
+            document.getElementById('app-container').style.display = 'flex';
             chatScreen.style.display = 'block';
             messageInput.disabled = false;
             sendButton.disabled = false;
             setTimeout(scrollToBottom, 0);
             alert(`Welcome, ${currentUser}!`);
             initializeWebSocket();
+            onlineUsers.add(currentUser);
+            updateUserList();
             populateRoomList();
             document.querySelector('[data-room="main"]').click();
         } else {
@@ -77,28 +80,37 @@ loginButton.addEventListener('click', async () => {
 // WebSocket Setup (Post-login)
 // =============================
 function initializeWebSocket() {
-    console.log("🔥 initializeWebSocket() called");
+    console.log("InitializeWebSocket() called");
     // ws = new WebSocket(`ws://${host}:8080?user=${encodeURIComponent(currentUser)}`)
     const wsUrl = `ws://${window.location.hostname}:8080?user=${encodeURIComponent(currentUser)}`;
-    console.log("🔌 Connecting to:", wsUrl);
+    console.log("Connecting to:", wsUrl);
     ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
         console.log('Connected to WebSocket');
-        const waitForSocketOpen = setInterval(() => {
-            if (ws.readyState === WebSocket.OPEN) {
-                setTimeout(() => {
-                    const mainRoom = document.querySelector('[data-room="main"]');
-                    if (mainRoom && ws.readyState === WebSocket.OPEN) {
-                        mainRoom.click();
-                    }
-                }, 50);
-                clearInterval(waitForSocketOpen);
+
+        // Wait until WebSocket is truly open and DOM is ready
+        const tryRoomJoin = setInterval(() => {
+            const mainRoom = document.querySelector('[data-room="main"]');
+            console.log('Waiting for mainRoom and WebSocket OPEN...', ws.readyState, mainRoom);
+
+            if (ws.readyState === WebSocket.OPEN && mainRoom) {
+                console.log('Joining Main Room...');
+                mainRoom.click();
+                clearInterval(tryRoomJoin);
             }
-        }, 50);
+            ws.send(JSON.stringify({
+                type: "status",
+                user: currentUser,
+                status: "online"
+            }));
+        }, 100);
+
+        // Start sending heartbeats
         setInterval(() => {
             if (ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: "heartbeat" }));
+                console.log(`[Heartbeat] Sent by ${currentUser}`);
             }
         }, 10000);
     };
@@ -108,19 +120,23 @@ function initializeWebSocket() {
             const data = JSON.parse(event.data);
     
             // Ignore heartbeat messages
-            if (data.type === "heartbeat") return;
-    
-            if (data.type === "message") {
-                if (data.room !== currentRoom) {
-                    // Optionally: queue them per room (future enhancement)
-                    return;
-                }
+            if (data.type === "heartbeat") {
+                console.log(`[Heartbeat] Received ping at ${new Date().toLocaleTimeString()}`);
+                return;
+            }
 
+            if (data.type === "message" && !data.rendered) {
+
+                if (data.room !== currentRoom) return;
+
+                const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 const isLink = data.message.includes("Shared a file:");
-                const message = data.user === currentUser
-                    ? `<span style="color: orange;">You</span>: ${isLink ? data.message : parseMarkdown(data.message)}`
-                    : `<span style="color: blue;">${data.user}</span>: ${isLink ? data.message : parseMarkdown(data.message)}`;
+                const raw = isLink ? data.message : parseMarkdown(data.message);
 
+                const message = data.user === currentUser
+                    ? `<div class="bubble you"><span class="meta">You • ${timestamp}</span><div>${raw}</div></div>`
+                    : `<div class="bubble other"><span class="meta">${data.user} • ${timestamp}</span><div>${raw}</div></div>`;
+                data.rendered = true;
                 addMessageToChat(message);
             }
     
@@ -135,7 +151,11 @@ function initializeWebSocket() {
                     }, 3000);
                 }
                 typingStatus.textContent = `${data.user} is typing...`;
-                setTimeout(() => { typingStatus.textContent = ''; }, 3000);
+                setTimeout(() => {
+                    typingStatus.textContent = '';
+                    typingStatus.dataset.user = '';
+                    updateUserList(); 
+                }, 3000);
                 return; // skip the fallback log
             }
     
@@ -145,13 +165,17 @@ function initializeWebSocket() {
                 } else if (data.status === "offline") {
                     onlineUsers.delete(data.user);
                 }
-
                 updateUserList();
             }
             if (data.type === "status" && data.status === "cleared the chat history") {
-                chatHistory.innerHTML = ''; // Added to attempt to clear the DOM
+                if (data.room === currentRoom) {
+                    chatHistory.innerHTML = ''; // Added to attempt to clear the DOM
+                    ws.send(JSON.stringify({
+                        type: "switch-room",
+                        room: currentRoom
+                    }));
+                }
             }
-    
         } catch (e) {
             console.error("Invalid message from server:", event.data);
         }
@@ -179,8 +203,12 @@ function sendMessage() {
         message: message
     }));
     messageInput.value = '';
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const isLink = message.includes("Shared a file:");
-    addMessageToChat(`<span style="color: orange;">You</span>: ${isLink ? message : parseMarkdown(message)}`);
+    const raw = isLink ? message : parseMarkdown(message);
+
+    const rendered = `<div class="bubble you"><span class="meta">You • ${timestamp}</span><div>${raw}</div></div>`;
+    addMessageToChat(rendered);
 }
 
 messageInput.addEventListener('keypress', (event) => {
@@ -202,6 +230,7 @@ logoutButton.addEventListener('click', () => {
     messageInput.disabled = true;
     sendButton.disabled = true;
     chatScreen.style.display = 'none';
+    document.getElementById('app-container').style.display = 'none';
     loginPage.style.display = 'block';
 });
 
@@ -220,11 +249,10 @@ function parseMarkdown(text) {
 // Chat Display Helpers
 // =============================
 function addMessageToChat(html) {
-    const div = document.createElement('div');
-    div.innerHTML = html;
-    chatHistory.appendChild(div);
+    chatHistory.insertAdjacentHTML('beforeend', html);
     scrollToBottom();
 }
+
 function scrollToBottom() {
     chatHistory.scrollTop = chatHistory.scrollHeight;
 }
@@ -278,6 +306,12 @@ document.querySelectorAll('.emoji').forEach(e => {
         messageInput.focus();
         emojiMenu.style.display = 'none';
     };
+});
+// 4. Auto-hide emoji menu if clicked outside
+document.addEventListener('click', (event) => {
+    if (!emojiMenu.contains(event.target) && event.target !== emojiButton) {
+        emojiMenu.style.display = 'none';
+    }
 });
 
 // =============================
@@ -372,7 +406,10 @@ function updateUserList() {
     onlineUsers.forEach(user => {
         const div = document.createElement('div');
         div.className = 'user-online';
-        div.textContent = user;
+        div.textContent = (user === currentUser) ? `${user} (You)` : user;
+        if (user === typingStatus.dataset.user) {
+            div.textContent += ' (typing...)';
+        }
         userList.appendChild(div);
     });
 }

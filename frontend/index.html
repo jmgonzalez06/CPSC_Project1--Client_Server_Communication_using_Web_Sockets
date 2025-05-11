@@ -17,26 +17,36 @@
         <button id="login-button">Login</button>
     </div>
 
-    <!-- Chat Screen -->
-    <div id="chat-screen" style="display: none;">
-        <div id="header">
-            <h1>SecureChat</h1>
-            <button id="logout-button">Logout</button> <!-- Logout Button Added -->
+    <!-- Chat Continer -->
+    <div id="chat-container">
+        <!-- Chat Side Bar -->
+        <div id="sidebar">
+            <h2>Rooms</h2>
+            <div id="room-list">
+                <div class="room selected" data-room="main">Main Chat</div>
+            </div>
         </div>
-        <div id="typing-status"></div>
-        <div id="chat-history"></div>
-        <div id="chat-input">
-            <input type="text" id="message-input" placeholder="Type a message..." disabled>
-            <button id="emoji-button">🙂</button>
-            <button id="bold-button">B</button>
-            <button id="italics-button">I</button>
-            <button id="underline-button">U</button>
-            <button id="send-button" disabled>Send</button> <!-- Send Button Created -->
-            <input type="file" id="file-input" style="display: none;">
-            <button id="file-button">📁</button>
-            <div id="emoji-menu" style="display: none;">
-                <button id="close-emoji-menu-button">X</button>
-                <div id="emoji-list"></div> <!-- Emoji list populates here -->
+        <!-- Chat Screen -->
+        <div id="chat-screen" style="display: none;">
+            <div id="header">
+                <h1>SecureChat</h1>
+                <button id="logout-button">Logout</button> <!-- Logout Button Added -->
+            </div>
+            <div id="typing-status"></div>
+            <div id="chat-history"></div>
+            <div id="chat-input">
+                <input type="text" id="message-input" placeholder="Type a message..." disabled>
+                <button id="emoji-button">🙂</button>
+                <button id="bold-button">B</button>
+                <button id="italics-button">I</button>
+                <button id="underline-button">U</button>
+                <button id="send-button" disabled>Send</button> <!-- Send Button Created -->
+                <input type="file" id="file-input" style="display: none;">
+                <button id="file-button">📁</button>
+                <div id="emoji-menu" style="display: none;">
+                    <button id="close-emoji-menu-button">X</button>
+                    <div id="emoji-list"></div> <!-- Emoji list populates here -->
+                </div>
             </div>
         </div>
     </div>

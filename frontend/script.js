@@ -7,6 +7,8 @@ console.log('Connecting to host:', host);
 
 let ws = null;
 let currentUser = null;
+let currentRoom = "main"; // default room
+
 
 // DOM element references
 const loginPage = document.getElementById('login-page');
@@ -59,6 +61,8 @@ loginButton.addEventListener('click', async () => {
             setTimeout(scrollToBottom, 0);
             alert(`Welcome, ${currentUser}!`);
             initializeWebSocket();
+            populateRoomList();
+            document.querySelector('[data-room="main"]').click();
         } else {
             alert(result.message || 'Invalid username or password.');
         }
@@ -80,11 +84,18 @@ function initializeWebSocket() {
 
     ws.onopen = () => {
         console.log('Connected to WebSocket');
+        const waitForSocketOpen = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+                const mainRoom = document.querySelector('[data-room="main"]');
+                if (mainRoom) mainRoom.click();
+                clearInterval(waitForSocketOpen);
+            }
+        }, 50);
         setInterval(() => {
             if (ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: "heartbeat" }));
             }
-        }, 10000); // Heartbeat every 10s
+        }, 10000);
     };
 
     ws.onmessage = (event) => {
@@ -95,10 +106,16 @@ function initializeWebSocket() {
             if (data.type === "heartbeat") return;
     
             if (data.type === "message") {
+                if (data.room !== currentRoom) {
+                    // Optionally: queue them per room (future enhancement)
+                    return;
+                }
+
                 const isLink = data.message.includes("Shared a file:");
                 const message = data.user === currentUser
                     ? `<span style="color: orange;">You</span>: ${isLink ? data.message : parseMarkdown(data.message)}`
                     : `<span style="color: blue;">${data.user}</span>: ${isLink ? data.message : parseMarkdown(data.message)}`;
+
                 addMessageToChat(message);
             }
     
@@ -140,6 +157,7 @@ function sendMessage() {
     ws.send(JSON.stringify({
         type: "message",
         user: currentUser,
+        room: currentRoom,
         message: message
     }));
     messageInput.value = '';
@@ -265,6 +283,7 @@ fileInput.onchange = async () => {
             ws.send(JSON.stringify({
                 type: "message",
                 user: currentUser,
+                 room: currentRoom,
                 message: `Shared a file: <a href="${result.url}" target="_blank">${file.name}</a>`
             }));
         } else {
@@ -275,3 +294,52 @@ fileInput.onchange = async () => {
         alert('Upload failed.');
     }
 };
+
+// =============================
+// Used to Pupulate a list of available chat rooms based on users
+// =============================
+function populateRoomList() {
+    const roomList = document.getElementById('room-list');
+    roomList.innerHTML = '';
+    const mainRoom = document.createElement('div');
+    mainRoom.className = 'room';
+    mainRoom.textContent = 'Main Chat';
+    mainRoom.dataset.room = 'main';
+    mainRoom.onclick = () => {
+        document.querySelectorAll('.room').forEach(r => r.classList.remove('selected'));
+        mainRoom.classList.add('selected');
+        currentRoom = 'main';
+        chatHistory.innerHTML = '';
+        // Notify the backend to load message history for the new room
+        ws.send(JSON.stringify({
+            type: "switch-room",
+            room: currentRoom
+        }));
+    };
+    roomList.appendChild(mainRoom);
+
+    // Dummy users for now — in real code, replace with live online users
+    const users = ['user1', 'user2', 'user3'].filter(u => u !== currentUser);
+
+    users.forEach(user => {
+        const roomName = currentUser < user ? `${currentUser}-${user}` : `${user}-${currentUser}`;
+        const roomDiv = document.createElement('div');
+        roomDiv.className = 'room';
+        roomDiv.textContent = `Chat with ${user}`;
+        roomDiv.dataset.room = roomName;
+
+        roomDiv.onclick = () => {
+            document.querySelectorAll('.room').forEach(r => r.classList.remove('selected'));
+            roomDiv.classList.add('selected');
+            currentRoom = roomName;
+            chatHistory.innerHTML = ''; // Clear UI for the selected room
+            // Notify backend to load chat history for this DM room
+            ws.send(JSON.stringify({
+                type: "switch-room",
+                room: currentRoom
+            }));
+        };
+
+        roomList.appendChild(roomDiv);
+    });
+}
